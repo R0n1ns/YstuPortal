@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <title>ЯРасписание — группа ЦИС-38</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* ===== ПЕРЕМЕННЫЕ ДЛЯ ТЕМ (по умолчанию светлая) ===== */
+    :root {
+      --bg-body: linear-gradient(145deg, #EFF3F8 0%, #E9EEF4 100%);
+      --bg-app: #F9FBFD;
+      --card-bg: white;
+      --text-primary: #0B2B40;
+      --text-secondary: #5B6E8C;
+      --accent: #1F6392;
+      --accent-light: #EFF6FF;
+      --accent-gradient: linear-gradient(115deg, #173E4C, #1F6392);
+      --border-color: rgba(203,213,225,0.4);
+      --tab-bg: #F1F4F9;
+      --tag-bg: #F1F5F9;
+      --tag-text: #1E4663;
+      --chip-bg: white;
+      --modal-bg: white;
+    }
+
+    /* Тёмная тема */
+    body[data-theme="dark"] {
+      --bg-body: linear-gradient(145deg, #1a1e2c 0%, #141824 100%);
+      --bg-app: #1E1F2C;
+      --card-bg: #2A2D3E;
+      --text-primary: #F0F3F8;
+      --text-secondary: #A0A8C0;
+      --accent: #4A9FD8;
+      --accent-light: #2A3A50;
+      --accent-gradient: linear-gradient(115deg, #1F4970, #2A6B9E);
+      --border-color: rgba(66, 72, 96, 0.5);
+      --tab-bg: #2A2D3E;
+      --tag-bg: #3A3F54;
+      --tag-text: #C5D0E6;
+      --chip-bg: #2A2D3E;
+      --modal-bg: #2A2D3E;
+    }
+
+    /* Синяя тема */
+    body[data-theme="blue"] {
+      --bg-body: linear-gradient(145deg, #E3F0FF 0%, #D4E6FF 100%);
+      --bg-app: #EBF3FE;
+      --card-bg: #FFFFFF;
+      --text-primary: #0A2B4A;
+      --text-secondary: #2C5282;
+      --accent: #0F6BB3;
+      --accent-light: #D9EEFF;
+      --accent-gradient: linear-gradient(115deg, #0A558C, #0F6BB3);
+      --border-color: rgba(31, 99, 146, 0.2);
+      --tab-bg: #D6E6F8;
+      --tag-bg: #D9EEFF;
+      --tag-text: #0F6BB3;
+      --chip-bg: white;
+      --modal-bg: white;
+    }
+
+    /* Зелёная тема */
+    body[data-theme="green"] {
+      --bg-body: linear-gradient(145deg, #E5F5E8 0%, #D4ECDA 100%);
+      --bg-app: #EEF9F1;
+      --card-bg: #FFFFFF;
+      --text-primary: #1A3A2A;
+      --text-secondary: #2D6A4F;
+      --accent: #2D6A4F;
+      --accent-light: #D8F3DC;
+      --accent-gradient: linear-gradient(115deg, #1B4D3E, #2D6A4F);
+      --border-color: rgba(45, 106, 79, 0.2);
+      --tab-bg: #D8F3DC;
+      --tag-bg: #D8F3DC;
+      --tag-text: #2D6A4F;
+      --chip-bg: white;
+      --modal-bg: white;
+    }
+
+    body {
+      background: var(--bg-body);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 12px;
+      transition: background 0.3s ease;
+    }
+
+    /* Мобильный контейнер */
+    .phone-mock {
+      max-width: 390px;
+      width: 100%;
+      height: 780px;
+      background-color: var(--card-bg);
+      border-radius: 44px;
+      box-shadow: 0 25px 45px rgba(0, 0, 0, 0.2), 0 0 0 6px #E2E8F0, 0 0 0 10px #CBD5E1;
+      overflow: hidden;
+      position: relative;
+      transition: background 0.3s ease;
+    }
+
+    .app-container {
+      height: 100%;
+      width: 100%;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: var(--bg-app);
+      scroll-behavior: smooth;
+      transition: background 0.3s ease;
+    }
+
+    .app-container::-webkit-scrollbar {
+      width: 3px;
+    }
+    .app-container::-webkit-scrollbar-track {
+      background: var(--bg-app);
+    }
+    .app-container::-webkit-scrollbar-thumb {
+      background: var(--accent);
+      border-radius: 10px;
+    }
+
+    /* Верхняя панель */
+    .top-bar {
+      padding: 20px 18px 10px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: transparent;
+    }
+
+    .greeting h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .greeting p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .profile-area {
+      background: var(--card-bg);
+      border-radius: 100px;
+      padding: 5px 12px 5px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+      cursor: pointer;
+      transition: 0.2s;
+      border: 1px solid var(--border-color);
+    }
+    .profile-area:active { transform: scale(0.97); }
+    .profile-icon {
+      background: var(--accent-gradient);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 16px;
+    }
+    .profile-text {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+    .profile-text small {
+      font-weight: 400;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+
+    /* Вкладки */
+    .tab-bar {
+      display: flex;
+      margin: 8px 18px 16px 18px;
+      background: var(--tab-bg);
+      border-radius: 40px;
+      padding: 4px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 8px 0;
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 32px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: 0.2s;
+    }
+    .tab.active {
+      background: var(--card-bg);
+      color: var(--accent);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+
+    /* Карточки главной */
+    .features-grid {
+      padding: 0 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 16px 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: 0.1s ease;
+    }
+    .card:active { transform: scale(0.98); }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--accent-light);
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--accent);
+    }
+    .card-title { font-size: 17px; font-weight: 700; color: var(--text-primary); }
+    .card-sub { font-size: 12px; color: var(--text-secondary); }
+    .card-preview {
+      font-size: 13px;
+      color: var(--text-primary);
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+      margin-top: 6px;
+      background: var(--accent-light);
+      border-radius: 14px;
+    }
+    .list-soft { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .tag {
+      background: var(--tag-bg);
+      border-radius: 30px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--tag-text);
+    }
+    .event-item {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 10px;
+      background: var(--accent-light);
+      padding: 6px 10px;
+      border-radius: 18px;
+    }
+    .event-date {
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 4px 10px;
+      text-align: center;
+      min-width: 52px;
+    }
+    .event-date .day { font-weight: 800; font-size: 15px; color: var(--accent); }
+    .event-date .month { font-size: 9px; text-transform: uppercase; color: var(--text-secondary);}
+    .choice-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      font-weight: 500;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+    .hero-banner {
+      margin: 0 18px 18px 18px;
+      background: var(--accent-gradient);
+      border-radius: 28px;
+      padding: 18px;
+      color: white;
+    }
+    .extra-links { padding: 0 18px 20px 18px; }
+    .link-chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .chip {
+      background: var(--chip-bg);
+      border-radius: 30px;
+      padding: 6px 14px;
+      font-size: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    /* Расписание */
+    .schedule-view {
+      padding: 0 16px 30px 16px;
+    }
+    .selector-panel {
+      background: var(--card-bg);
+      border-radius: 28px;
+      padding: 14px;
+      margin-bottom: 18px;
+      border: 1px solid var(--border-color);
+    }
+    .selector-title {
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+    .day-btn, .week-btn {
+      background: var(--tag-bg);
+      border: none;
+      padding: 8px 14px;
+      border-radius: 40px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .day-btn.active, .week-btn.active {
+      background: var(--accent);
+      color: white;
+    }
+    .lesson-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 14px;
+      margin-bottom: 12px;
+      border: 1px solid var(--border-color);
+    }
+    .lesson-time {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--accent);
+      background: var(--accent-light);
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 10px;
+    }
+    .lesson-name {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .lesson-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border-top: 1px solid var(--border-color);
+      padding-top: 8px;
+    }
+    .detail-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--accent-light);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .day-header {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 12px 0 12px 0;
+      padding-left: 6px;
+      border-left: 4px solid var(--accent);
+    }
+    .back-home {
+      background: var(--tag-bg);
+      border: none;
+      padding: 12px;
+      border-radius: 40px;
+      width: 100%;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    /* Настройки (темы) */
+    .settings-view {
+      padding: 0 18px 30px 18px;
+    }
+    .settings-card {
+      background: var(--card-bg);
+      border-radius: 28px;
+      padding: 20px;
+      border: 1px solid var(--border-color);
+    }
+    .settings-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .theme-options {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .theme-option {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px;
+      border-radius: 20px;
+      background: var(--bg-app);
+      cursor: pointer;
+      transition: 0.2s;
+      border: 2px solid transparent;
+    }
+    .theme-option.active {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+    .theme-color {
+      width: 48px;
+      height: 48px;
+      border-radius: 24px;
+    }
+    .theme-info h4 {
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .theme-info p {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Модальное окно */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+    .login-modal {
+      background: var(--modal-bg);
+      border-radius: 40px;
+      width: 320px;
+      max-width: 85%;
+      padding: 28px 24px 32px;
+      text-align: center;
+      box-shadow: 0 30px 40px rgba(0,0,0,0.2);
+      transform: scale(0.9);
+      transition: transform 0.25s ease;
+    }
+    .modal-overlay.active .login-modal {
+      transform: scale(1);
+    }
+    .modal-icon {
+      background: var(--accent-gradient);
+      width: 70px;
+      height: 70px;
+      border-radius: 35px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: white;
+      font-size: 32px;
+    }
+    .login-modal h3 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .datetime {
+      background: var(--accent-light);
+      border-radius: 28px;
+      padding: 12px;
+      margin: 16px 0 20px;
+    }
+    .date-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .time-text {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+    .input-group {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+    .input-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 6px;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 1.5px solid var(--border-color);
+      border-radius: 30px;
+      font-size: 14px;
+      background: var(--bg-app);
+      color: var(--text-primary);
+    }
+    .login-btn {
+      background: var(--accent-gradient);
+      color: white;
+      border: none;
+      width: 100%;
+      padding: 14px;
+      border-radius: 40px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .close-modal {
+      margin-top: 16px;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body data-theme="light">
+<div class="phone-mock">
+  <div class="app-container" id="appContainer">
+    <div class="top-bar">
+      <div class="greeting">
+        <h2 id="greetingName">Привет, студент 👋</h2>
+        <p>ЯГТУ · весенний семестр</p>
+      </div>
+      <div class="profile-area" id="profileBtn">
+        <div class="profile-icon"><i class="fas fa-user-graduate"></i></div>
+        <div class="profile-text" id="profileText">Войти <i class="fas fa-chevron-right"></i><small>личный кабинет</small></div>
+      </div>
+    </div>
+
+    <div class="tab-bar" id="tabBar">
+      <div class="tab active" data-tab="home">Главная</div>
+      <div class="tab" data-tab="schedule">Расписание</div>
+      <div class="tab" data-tab="settings">Тема</div>
+    </div>
+
+    <!-- ГЛАВНАЯ СТРАНИЦА -->
+    <div id="homeView">
+      <div class="hero-banner">
+        <h3>📱 ЯРасписание</h3>
+        <p style="font-size:12px; margin-top:4px;">Умное расписание для студентов ЯГТУ.</p>
+        <div style="background:rgba(255,255,255,0.2); display:inline-block; padding:4px 12px; border-radius:40px; font-size:11px; margin-top:10px;">Обновления каждую неделю</div>
+      </div>
+      <div class="features-grid">
+        <div class="card" id="scheduleCard">
+          <div class="card-header"><div class="card-icon"><i class="far fa-calendar-alt"></i></div><div><div class="card-title">Расписание</div><div class="card-sub">группа ЦИС-38 · 10 неделя</div></div></div>
+          <div class="card-preview">📚 Проектная деятельность 8:30<br>🛠 Инструментальные средства ИС 12:20</div>
+          <div class="list-soft"><span class="tag"><i class="far fa-clock"></i> пары сегодня: 2</span><span class="tag"><i class="fas fa-building"></i> главный корпус</span></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon"><i class="fas fa-users"></i></div><div><div class="card-title">Состав группы</div><div class="card-sub">ЦИС-38 · 30 человек</div></div></div>
+          <div class="list-soft">
+            <span class="tag">Хабарова В.</span><span class="tag">Родин В.</span><span class="tag">Жаворонкова А.</span>
+            <span class="tag">Коробов В.</span><span class="tag">Бабуричев В.</span><span class="tag">Вахрамеев Н.</span>
+            <span class="tag">+24 студента</span>
+          </div>
+          <div class="card-preview"><i class="fas fa-star-of-life"></i> Староста: Кислякова К.</div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon"><i class="fas fa-calendar-check"></i></div><div><div class="card-title">Мероприятия</div><div class="card-sub">ближайшие события</div></div></div>
+          <div class="event-item"><div class="event-date"><span class="day">9</span><span class="month">апр</span></div><div class="event-name">🎵 Меломан</div></div>
+          <div class="event-item"><div class="event-date"><span class="day">23</span><span class="month">апр</span></div><div class="event-name">👑 Мистер ЯГТУ</div></div>
+          <div class="event-item"><div class="event-date"><span class="day">26</span><span class="month">мая</span></div><div class="event-name">👸 Мисс ЯГТУ</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-icon"><i class="fas fa-graduation-cap"></i></div><div><div class="card-title">Направление</div><div class="card-sub">09.03.02 Информационные системы и технологии</div></div></div>
+          <div class="choice-item"><i class="fas fa-code-branch"></i> Вектор по выбору</div>
+          <div class="choice-item"><i class="fas fa-chalkboard-user"></i> Направление по выбору</div>
+          <div class="choice-item"><i class="fas fa-leaf"></i> Free minor</div>
+        </div>
+      </div>
+      <div class="extra-links"><div class="link-chips"><div class="chip"><i class="fas fa-map-marker-alt"></i> Карта корпусов</div><div class="chip"><i class="fas fa-book-open"></i> Эл. библиотека</div></div></div>
+      <div style="margin:10px 18px 25px; border-top:1px solid var(--border-color); padding-top:12px; font-size:11px; color:var(--text-secondary); text-align:center;">ЯРасписание · студенческий портал</div>
+    </div>
+
+    <!-- СТРАНИЦА РАСПИСАНИЯ -->
+    <div id="scheduleView" style="display: none;">
+      <div class="schedule-view">
+        <div class="selector-panel">
+          <div class="selector-title"><i class="fas fa-calendar-week"></i> Выберите день и неделю</div>
+          <div class="weekday-buttons" id="dayButtons">
+            <button class="day-btn" data-day="monday">ПН</button>
+            <button class="day-btn" data-day="tuesday">ВТ</button>
+            <button class="day-btn" data-day="wednesday">СР</button>
+            <button class="day-btn" data-day="thursday">ЧТ</button>
+            <button class="day-btn" data-day="friday">ПТ</button>
+            <button class="day-btn" data-day="saturday">СБ</button>
+          </div>
+          <div class="week-switch">
+            <button class="week-btn active" data-week="10">10 неделя (6–12 апр)</button>
+            <button class="week-btn" data-week="11">11 неделя (13–19 апр)</button>
+          </div>
+        </div>
+        <div id="scheduleList"><div class="empty-lesson">Загрузка...</div></div>
+        <button class="back-home" id="backHomeBtn"><i class="fas fa-arrow-left"></i> На главную</button>
+      </div>
+    </div>
+
+    <!-- СТРАНИЦА НАСТРОЕК (ТЕМЫ) -->
+    <div id="settingsView" style="display: none;">
+      <div class="settings-view">
+        <div class="settings-card">
+          <div class="settings-title"><i class="fas fa-palette"></i> Оформление приложения</div>
+          <div class="theme-options" id="themeOptions">
+            <div class="theme-option" data-theme="light">
+              <div class="theme-color" style="background: linear-gradient(135deg, #EFF3F8, #FFFFFF); border: 1px solid #CBD5E1;"></div>
+              <div class="theme-info"><h4>Светлая тема</h4><p>Классическое светлое оформление</p></div>
+            </div>
+            <div class="theme-option" data-theme="dark">
+              <div class="theme-color" style="background: linear-gradient(135deg, #1a1e2c, #2A2D3E); border: 1px solid #4A4F6E;"></div>
+              <div class="theme-info"><h4>Тёмная тема</h4><p>Комфортно для глаз в темноте</p></div>
+            </div>
+            <div class="theme-option" data-theme="blue">
+              <div class="theme-color" style="background: linear-gradient(135deg, #D4E6FF, #0F6BB3); border: 1px solid #0F6BB3;"></div>
+              <div class="theme-info"><h4>Синяя тема</h4><p>Свежий голубой акцент</p></div>
+            </div>
+            <div class="theme-option" data-theme="green">
+              <div class="theme-color" style="background: linear-gradient(135deg, #D4ECDA, #2D6A4F); border: 1px solid #2D6A4F;"></div>
+              <div class="theme-info"><h4>Зелёная тема</h4><p>Природная свежесть</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО ВХОДА -->
+<div id="loginModal" class="modal-overlay">
+  <div class="login-modal">
+    <div class="modal-icon"><i class="fas fa-university"></i></div>
+    <h3>ЯРасписание</h3>
+    <p style="font-size:13px; color:var(--text-secondary);">Вход в личный кабинет</p>
+    <div class="datetime" id="datetimeWidget">
+      <div class="date-text" id="currentDate">--</div>
+      <div class="time-text" id="currentTime">--:--:--</div>
+    </div>
+    <div class="input-group"><label><i class="fas fa-user"></i> Логин</label><input type="text" id="loginInput" placeholder="студент_цис38"></div>
+    <div class="input-group"><label><i class="fas fa-lock"></i> Пароль</label><input type="password" id="passwordInput" placeholder="••••••••"></div>
+    <button class="login-btn" id="doLoginBtn"><i class="fas fa-sign-in-alt"></i> Войти</button>
+    <button class="close-modal" id="closeModalBtn">Закрыть</button>
+  </div>
+</div>
+
+<script>
+  // ========== ДАННЫЕ РАСПИСАНИЯ ==========
+  const scheduleData10 = { monday: { date: "06.04.2026", lessons: [{ time: "08:30 – 12:00 (4ч)", name: "Администрирование баз данных (ИСТ)", type: "пр.з*", room: "Г-918", teacher: "преп. Акимова ЛЛ" },{ time: "08:30 – 12:00 (4ч)", name: "Автоматизация бизнес-процессов (ИСТ)", type: "пр.з*", room: "Г-924", teacher: "преп. Павлыш ЕР" },{ time: "12:20 – 15:50 (4ч)", name: "Инструментальные средства ИС", type: "пр.з", room: "Г-514", teacher: "асс. Мякшина ИЮ" },{ time: "15:40 – 19:10 (4ч)", name: "Экономика ИТ-отрасли (УП)", type: "пр.з", room: "Г-924", teacher: "ст.преп. Страусова АА" }]}, tuesday: { date: "07.04.2026", lessons: [{ time: "10:10 – 11:40", name: "Прикладная физическая культура", type: "пр.з*", room: "Сп-1", teacher: "—" },{ time: "15:40 – 19:10 (4ч)", name: "Современный этикет делового человека (ПО) free minor", type: "пр.з*", room: "В-201", teacher: "преп. Приятелева ЛГ" }]}, wednesday: { date: "08.04.2026", lessons: [{ time: "08:30 – 12:00 (4ч)", name: "Этика и психология деловых отношений (ПО) Free Minor", type: "пр.з*", room: "—", teacher: "преп. Приятелева ЛГ" }]}, thursday: { date: "09.04.2026", lessons: [{ time: "12:20 – 15:50 (4ч)", name: "Большие данные (ИС)", type: "пр.з", room: "Г-630", teacher: "ст.преп. Бахаева ДД" }]}, friday: { date: "10.04.2026", lessons: [{ time: "08:30 – 12:00 (4ч)", name: "Бизнес-планирование и инвестиционное проектирование (ЭУ)", type: "пр.з*", room: "Дистант", teacher: "преп. Никитина ЕА" },{ time: "08:30 – 12:00 (4ч)", name: "Теоретические и экспериментальные методы исследований ИСТ", type: "пр.з*", room: "Дистант", teacher: "доц. Горовой ЮМ" },{ time: "15:40 – 17:10", name: "Прикладная физическая культура", type: "пр.з*", room: "Сп-1", teacher: "—" }]}, saturday: { date: "11.04.2026", lessons: [{ time: "08:30 – 12:00 (4ч)", name: "Личностно-профессиональная компетентность руководителя (ПО) free minor", type: "лек.*", room: "—", teacher: "преп. Приятелева ЛГ" },{ time: "12:20 – 15:50 (4ч)", name: "Создание, анализ и рефакторинг кода (ИСТ)", type: "лек.*", room: "Дистант", teacher: "асс. Толстикова СЛ" }]} };
+  const scheduleData11 = { monday: { date: "13.04.2026", lessons: [{ time: "08:30 – 12:00", name: "Проектная практика", type: "пр.з", room: "Г-514", teacher: "доц. Иванов" }] }, tuesday: { date: "14.04.2026", lessons: [{ time: "10:10 – 11:40", name: "Прикладная физическая культура", type: "пр.з", room: "Сп-1", teacher: "—" }] }, wednesday: { date: "15.04.2026", lessons: [{ time: "08:30 – 12:00", name: "Современные информационные системы", type: "лек", room: "Г-630", teacher: "проф. Петрова" }] }, thursday: { date: "16.04.2026", lessons: [{ time: "12:20 – 15:50", name: "Базы данных", type: "пр.з", room: "Г-918", teacher: "преп. Соколова" }] }, friday: { date: "17.04.2026", lessons: [{ time: "08:30 – 12:00", name: "Экономика ИТ", type: "лек", room: "Дистант", teacher: "ст.преп. Орлова" }] }, saturday: { date: "18.04.2026", lessons: [{ time: "08:30 – 12:00", name: "Free minor: Управление проектами", type: "пр.з", room: "В-201", teacher: "преп. Приятелева" }] } };
+
+  let currentWeek = 10, currentDay = "monday";
+  function getCurrentData() { return currentWeek === 10 ? scheduleData10 : scheduleData11; }
+  function renderScheduleMobile() {
+    const data = getCurrentData(), dayData = data[currentDay], container = document.getElementById("scheduleList");
+    if (!dayData || !dayData.lessons || !dayData.lessons.length) { container.innerHTML = `<div class="empty-lesson">📭 На этот день пар нет</div>`; return; }
+    let dayName = { monday:"Понедельник", tuesday:"Вторник", wednesday:"Среда", thursday:"Четверг", friday:"Пятница", saturday:"Суббота" }[currentDay];
+    let html = `<div class="day-header">📅 ${dayName} · ${dayData.date}</div>`;
+    dayData.lessons.forEach(l => { html += `<div class="lesson-card"><div class="lesson-time">🕒 ${l.time}</div><div class="lesson-name">📖 ${l.name}</div><div class="lesson-details"><div class="detail-item"><i class="fas fa-chalkboard-teacher"></i> ${l.teacher}</div><div class="detail-item"><i class="fas fa-door-open"></i> ${l.room}</div><div class="detail-item"><i class="fas fa-tasks"></i> ${l.type}</div></div></div>`; });
+    container.innerHTML = html;
+  }
+  function setActiveDayButton() { document.querySelectorAll(".day-btn").forEach(btn => { if(btn.getAttribute("data-day")===currentDay) btn.classList.add("active"); else btn.classList.remove("active"); }); }
+  function setActiveWeekButton() { document.querySelectorAll(".week-btn").forEach(btn => { if(parseInt(btn.getAttribute("data-week"))===currentWeek) btn.classList.add("active"); else btn.classList.remove("active"); }); }
+
+  // Переключение табов
+  let currentTab = "home";
+  const homeDiv = document.getElementById("homeView"), scheduleDiv = document.getElementById("scheduleView"), settingsDiv = document.getElementById("settingsView");
+  function switchTab(tab) {
+    currentTab = tab;
+    homeDiv.style.display = tab === "home" ? "block" : "none";
+    scheduleDiv.style.display = tab === "schedule" ? "block" : "none";
+    settingsDiv.style.display = tab === "settings" ? "block" : "none";
+    if(tab === "schedule") { renderScheduleMobile(); setActiveDayButton(); setActiveWeekButton(); }
+    document.querySelectorAll(".tab").forEach(t => { if(t.getAttribute("data-tab")===tab) t.classList.add("active"); else t.classList.remove("active"); });
+  }
+  document.getElementById("dayButtons")?.addEventListener("click", (e) => { const btn = e.target.closest(".day-btn"); if(btn) { currentDay = btn.getAttribute("data-day"); renderScheduleMobile(); setActiveDayButton(); } });
+  document.querySelectorAll(".week-btn").forEach(btn => { btn.addEventListener("click", () => { currentWeek = parseInt(btn.getAttribute("data-week")); renderScheduleMobile(); setActiveWeekButton(); }); });
+  document.getElementById("backHomeBtn")?.addEventListener("click", () => switchTab("home"));
+  document.getElementById("scheduleCard")?.addEventListener("click", () => switchTab("schedule"));
+  document.querySelectorAll(".tab").forEach(tab => { tab.addEventListener("click", () => switchTab(tab.getAttribute("data-tab"))); });
+
+  // ========== ТЕМЫ ==========
+  function setTheme(theme) {
+    document.body.setAttribute("data-theme", theme);
+    localStorage.setItem("appTheme", theme);
+    document.querySelectorAll(".theme-option").forEach(opt => {
+      if(opt.getAttribute("data-theme") === theme) opt.classList.add("active");
+      else opt.classList.remove("active");
+    });
+  }
+  document.querySelectorAll(".theme-option").forEach(opt => {
+    opt.addEventListener("click", () => setTheme(opt.getAttribute("data-theme")));
+  });
+  const savedTheme = localStorage.getItem("appTheme") || "light";
+  setTheme(savedTheme);
+
+  // ========== МОДАЛЬНЫЙ ВХОД ==========
+  const modal = document.getElementById("loginModal");
+  const profileBtn = document.getElementById("profileBtn");
+  const closeModalBtn = document.getElementById("closeModalBtn");
+  const doLoginBtn = document.getElementById("doLoginBtn");
+  const loginInput = document.getElementById("loginInput");
+  const passwordInput = document.getElementById("passwordInput");
+  const greetingNameSpan = document.getElementById("greetingName");
+  const profileTextSpan = document.getElementById("profileText");
+
+  function updateDateTime() {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById("currentDate").innerHTML = `<i class="far fa-calendar-alt"></i> ${dateStr}`;
+    document.getElementById("currentTime").innerHTML = timeStr;
+  }
+  updateDateTime();
+  setInterval(updateDateTime, 1000);
+
+  profileBtn.addEventListener("click", () => { modal.classList.add("active"); loginInput.value = ""; passwordInput.value = ""; });
+  closeModalBtn.addEventListener("click", () => modal.classList.remove("active"));
+  modal.addEventListener("click", (e) => { if(e.target === modal) modal.classList.remove("active"); });
+  doLoginBtn.addEventListener("click", () => {
+    const login = loginInput.value.trim();
+    if(login === "" || passwordInput.value.trim() === "") { alert("Введите логин и пароль"); return; }
+    greetingNameSpan.innerHTML = `Привет, ${login} 👋`;
+    profileTextSpan.innerHTML = `${login} <i class="fas fa-check-circle"></i><small>профиль</small>`;
+    modal.classList.remove("active");
+  });
+  loginInput.addEventListener("keypress", (e) => { if(e.key === "Enter") doLoginBtn.click(); });
+  passwordInput.addEventListener("keypress", (e) => { if(e.key === "Enter") doLoginBtn.click(); });
+  renderScheduleMobile();
+</script>
+</body>
+</html>
