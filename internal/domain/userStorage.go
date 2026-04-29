@@ -7,6 +7,6 @@ import (
 )
 
 type UserStorage interface {
-	SaveUser(ctx context.Context, user *UserPort) error
-	GetUser(ctx context.Context, id uuid.UUID) (*UserPort, error)
+	SaveUser(ctx context.Context, user *User) error
+	GetUser(ctx context.Context, id uuid.UUID) (*User, error)
 }

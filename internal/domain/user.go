@@ -26,5 +26,5 @@ type UserPort interface {
 }
 
 type UserProvider interface {
-	AuthUser(ctx context.Context, username, password string) (*UserPort, error)
+	AuthUser(ctx context.Context, username, password string) (*User, error)
 }

@@ -1,4 +1,4 @@
-package userData
+package userProvider
 
 import (
 	"YstuPortal/internal/domain"
@@ -126,7 +126,10 @@ func DecodeWindows1251(r io.Reader) (io.Reader, error) {
 	return charmap.Windows1251.NewDecoder().Reader(r), nil
 }
 
-func (u *UserStorage) GetUser(uuid uuid.UUID) (*domain.User, error) {
+func (u *UserStorage) GetUser(ctx context.Context, uuid uuid.UUID) (*domain.User, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	u.mu.Lock()
 	user, ok := u.users[uuid]
 	if !ok {
@@ -144,4 +147,13 @@ func (u *UserStorage) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
 	}
 	u.mu.Unlock()
 	return user, nil
+}
+func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	u.mu.Lock()
+	u.users[user.Id] = user
+	u.mu.Unlock()
+	return nil
 }

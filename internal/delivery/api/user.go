@@ -1,18 +1,27 @@
 package api
 
 import (
-	"YstuPortal/internal"
+	"YstuPortal/internal/logic"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
 
-func UserRoutes(router fiber.Router) {
-	router = router.Group("/user")
-	router.Get("/info", UserInfoGet)
+type UserApi struct {
+	UserManager logic.UserManager
 }
-func UserInfoGet(ctx fiber.Ctx) error {
-	user, err := internal.UserStor.GetUser(uuid.MustParse(ctx.Value("UserId").(string)))
+
+func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
+	u := UserApi{
+		UserManager: d,
+	}
+	router = router.Group("/user")
+	router.Get("/info", u.UserInfoGet)
+	return &u
+}
+
+func (u UserApi) UserInfoGet(ctx fiber.Ctx) error {
+	user, err := u.UserManager.UserStorage.GetUser(ctx, uuid.MustParse(ctx.Value("UserId").(string)))
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(fiber.Map{"error": err.Error()})

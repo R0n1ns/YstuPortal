@@ -2,16 +2,22 @@ package main
 
 import (
 	"YstuPortal/internal/delivery/api"
-	"YstuPortal/internal/repository/userData"
+	"YstuPortal/internal/logic"
+	"YstuPortal/internal/repository/userProvider"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-var UserStorage = userData.NewUserStorage()
+var UserStorage = userProvider.NewUserStorage()
 
 func main() {
+	parser := userProvider.NewUserStorage()
+	dataManager, _ := logic.NewUserManager(parser, parser)
+
 	app := fiber.New()
-	api.AuthRoutes(app)
-	api.UserRoutes(app)
+
+	_ = api.NewLoginApi(app, *dataManager)
+	_ = api.NewUserApi(app, *dataManager)
+
 	app.Listen(":8080")
 }

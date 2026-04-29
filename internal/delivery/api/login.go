@@ -1,9 +1,8 @@
 package api
 
 import (
-	"YstuPortal/internal/domain"
+	"YstuPortal/internal/logic"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -11,14 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type UserApi struct {
-	DataManager *domain.UserProvider
+type LoginApi struct {
+	DataManager logic.UserManager
 }
 
 var jwtSecret = "test"
 
-func NewUserApi(router fiber.Router, manager *domain.UserProvider) *UserApi {
-	mngr := &UserApi{DataManager: manager}
+func NewLoginApi(router fiber.Router, manager logic.UserManager) *LoginApi {
+	mngr := &LoginApi{DataManager: manager}
 	router = router.Group("/")
 	router.Post("/login", mngr.LoginPost)
 	router.Post("/logout", mngr.LogoutPost)
@@ -26,7 +25,7 @@ func NewUserApi(router fiber.Router, manager *domain.UserProvider) *UserApi {
 	return mngr
 }
 
-func (u *UserApi) AuthMiddleware(ctx fiber.Ctx) error {
+func (u *LoginApi) AuthMiddleware(ctx fiber.Ctx) error {
 	cookie := ctx.Cookies("jwt")
 	if cookie == "" {
 		ctx.Status(fiber.StatusUnauthorized)
@@ -47,12 +46,12 @@ func (u *UserApi) AuthMiddleware(ctx fiber.Ctx) error {
 
 	ctx.Locals("UserId", claims.Issuer)
 
-	fmt.Println(claims)
+	//fmt.Println(claims)
 
 	return ctx.Next()
 }
 
-func (u *UserApi) LoginPost(ctx fiber.Ctx) error {
+func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 	if !ctx.HasBody() {
 		return ctx.SendStatus(fiber.StatusBadRequest)
 	}
@@ -63,24 +62,24 @@ func (u *UserApi) LoginPost(ctx fiber.Ctx) error {
 	})
 
 	if err := json.Unmarshal(ctx.Body(), &data); err != nil {
-		fmt.Println("json", err)
+		//fmt.Println("json", err)
 		return err
 	}
 
-	user, err := u.DataManager.AuthUser(ctx)
+	user, err := u.DataManager.UserProvider.AuthUser(ctx, data.Name, data.Pass)
 	if err != nil {
 		return ctx.SendStatus(fiber.StatusForbidden)
 	}
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		Id:        uuid.New().String(),
-		Issuer:    (*user).GetId().String(),
+		Issuer:    (*user).Id.String(),
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	token, err := claims.SignedString([]byte(jwtSecret))
 	if err != nil {
-		fmt.Println("claims", err)
+		//fmt.Println("claims", err)
 		ctx.Status(fiber.StatusInternalServerError)
 		return err
 	}
@@ -90,13 +89,13 @@ func (u *UserApi) LoginPost(ctx fiber.Ctx) error {
 		Value:    token,
 		HTTPOnly: true,
 	})
-	fmt.Println(data.Name, data.Pass)
+	//fmt.Println(data.Name, data.Pass)
 	ctx.SendStatus(fiber.StatusOK)
 	return nil
 
 }
 
-func LogoutPost(ctx fiber.Ctx) error {
+func (u *LoginApi) LogoutPost(ctx fiber.Ctx) error {
 	ctx.ClearCookie()
 	ctx.SendStatus(fiber.StatusOK)
 	return nil
