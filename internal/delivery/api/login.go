@@ -18,7 +18,7 @@ var jwtSecret = "test"
 
 func NewLoginApi(router fiber.Router, manager logic.UserManager) *LoginApi {
 	mngr := &LoginApi{DataManager: manager}
-	router = router.Group("/")
+	router = router.Group("/auth")
 	router.Post("/login", mngr.LoginPost)
 	router.Post("/logout", mngr.LogoutPost)
 	router.Use(mngr.AuthMiddleware)
@@ -57,7 +57,7 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 	}
 
 	data := new(struct {
-		Name string `json:"name"`
+		Name string `json:"login"`
 		Pass string `json:"password"`
 	})
 
@@ -66,7 +66,7 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 		return err
 	}
 
-	user, err := u.DataManager.UserProvider.AuthUser(ctx, data.Name, data.Pass)
+	user, err := u.DataManager.Login(ctx, data.Name, data.Pass)
 	if err != nil {
 		return ctx.SendStatus(fiber.StatusForbidden)
 	}

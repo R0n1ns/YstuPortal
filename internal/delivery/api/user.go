@@ -21,7 +21,7 @@ func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
 }
 
 func (u UserApi) UserInfoGet(ctx fiber.Ctx) error {
-	user, err := u.UserManager.UserStorage.GetUser(ctx, uuid.MustParse(ctx.Value("UserId").(string)))
+	user, err := u.UserManager.GetInfo(ctx, uuid.MustParse(ctx.Value("UserId").(string)))
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(fiber.Map{"error": err.Error()})

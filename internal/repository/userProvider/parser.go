@@ -16,14 +16,26 @@ import (
 	"golang.org/x/text/encoding/charmap"
 )
 
-type UserStorage struct {
+type UserParser struct {
+	storage domain.UserStorage
 	mu      sync.RWMutex
 	clients map[uuid.UUID]*http.Client
 	cookies map[uuid.UUID][]*http.Cookie
-	users   map[uuid.UUID]*domain.User
 }
 
-func (s *UserStorage) AuthUser(ctx context.Context, username, password string) (*domain.User, error) {
+func (s *UserParser) GetEstimations(ctx context.Context) (*map[int]domain.Subject, error) {
+	//TODO заполнить получение оценок
+	panic("implement me")
+}
+
+func NewUserParser(storage domain.UserStorage) *UserParser {
+	return &UserParser{
+		storage: storage,
+		clients: make(map[uuid.UUID]*http.Client),
+		cookies: make(map[uuid.UUID][]*http.Cookie),
+	}
+}
+func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*domain.User, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -107,39 +119,21 @@ func (s *UserStorage) AuthUser(ctx context.Context, username, password string) (
 	// 5. Сохраняем клиента в кэш хранилища для последующего использования
 	s.mu.Lock()
 	s.clients[newUser.Id] = client
-	s.users[newUser.Id] = &newUser
 	s.cookies[newUser.Id] = client.Jar.Cookies(u)
 	s.mu.Unlock()
 
-	return &newUser, nil
-}
-
-func NewUserStorage() *UserStorage {
-	return &UserStorage{
-		clients: make(map[uuid.UUID]*http.Client),
-		users:   make(map[uuid.UUID]*domain.User),
-		cookies: make(map[uuid.UUID][]*http.Cookie),
+	if err := s.storage.SaveUser(ctx, &newUser); err != nil {
+		return nil, err
 	}
+
+	return &newUser, nil
 }
 
 func DecodeWindows1251(r io.Reader) (io.Reader, error) {
 	return charmap.Windows1251.NewDecoder().Reader(r), nil
 }
 
-func (u *UserStorage) GetUser(ctx context.Context, uuid uuid.UUID) (*domain.User, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	u.mu.Lock()
-	user, ok := u.users[uuid]
-	if !ok {
-		return nil, fmt.Errorf("нет такого пользователя")
-	}
-	u.mu.Unlock()
-	return user, nil
-}
-
-func (u *UserStorage) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
+func (u *UserParser) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
 	u.mu.Lock()
 	user, ok := u.clients[uuid]
 	if !ok {
@@ -148,12 +142,6 @@ func (u *UserStorage) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
 	u.mu.Unlock()
 	return user, nil
 }
-func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	u.mu.Lock()
-	u.users[user.Id] = user
-	u.mu.Unlock()
-	return nil
-}
+
+//TODO: сдеать получение предметов по выбору (вектор, freeminor)
+//TODO: получить среднюю оценку
