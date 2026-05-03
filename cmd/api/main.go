@@ -13,7 +13,7 @@ import (
 
 func main() {
 	storage := db.NewUserStorage()
-	parser := userProvider.NewUserParser(storage)
+	parser := userProvider.NewUserParser()
 	dataManager, _ := logic.NewUserManager(parser, storage)
 
 	app := fiber.New()

@@ -3,8 +3,6 @@ package logic
 import (
 	"YstuPortal/internal/domain"
 	"context"
-
-	"github.com/google/uuid"
 )
 
 type UserManager struct {
@@ -27,20 +25,33 @@ func (u UserManager) Login(ctx context.Context, username, password string) (*dom
 	if err != nil {
 		return nil, err
 	}
+
 	err = u.UserStorage.SaveUser(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (u UserManager) GetInfo(ctx context.Context, userName string) (*domain.User, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	user, err := u.UserStorage.GetUser(ctx, userName)
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
 }
 
-func (u UserManager) GetInfo(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+func (u UserManager) GetEstimations(ctx context.Context, userName string) (map[int]domain.Subject, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	user, err := u.UserStorage.GetUser(ctx, id)
+	user, err := u.UserStorage.GetUser(ctx, userName)
 	if err != nil {
 		return nil, err
 	}
-	return user, nil
+	return user.Estimations, nil
 }

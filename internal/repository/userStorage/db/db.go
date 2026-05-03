@@ -5,27 +5,25 @@ import (
 	"context"
 	"fmt"
 	"sync"
-
-	"github.com/google/uuid"
 )
 
 type UserStorage struct {
 	mu    sync.RWMutex
-	users map[uuid.UUID]*domain.User
+	users map[string]*domain.User
 }
 
 func NewUserStorage() *UserStorage {
 	return &UserStorage{
-		users: make(map[uuid.UUID]*domain.User),
+		users: make(map[string]*domain.User),
 	}
 }
 
-func (u *UserStorage) GetUser(ctx context.Context, uuid uuid.UUID) (*domain.User, error) {
+func (u *UserStorage) GetUser(ctx context.Context, userName string) (*domain.User, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	u.mu.Lock()
-	user, ok := u.users[uuid]
+	user, ok := u.users[userName]
 	if !ok {
 		return nil, fmt.Errorf("нет такого пользователя")
 	}
@@ -36,8 +34,9 @@ func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	u.mu.Lock()
-	u.users[user.Id] = user
+	u.users[user.UserName] = user
 	u.mu.Unlock()
 	return nil
 }

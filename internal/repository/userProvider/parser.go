@@ -12,27 +12,19 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/google/uuid"
 	"golang.org/x/text/encoding/charmap"
 )
 
 type UserParser struct {
-	storage domain.UserStorage
 	mu      sync.RWMutex
-	clients map[uuid.UUID]*http.Client
-	cookies map[uuid.UUID][]*http.Cookie
+	clients map[string]*http.Client
+	cookies map[string][]*http.Cookie
 }
 
-func (s *UserParser) GetEstimations(ctx context.Context) (*map[int]domain.Subject, error) {
-	//TODO заполнить получение оценок
-	panic("implement me")
-}
-
-func NewUserParser(storage domain.UserStorage) *UserParser {
+func NewUserParser() *UserParser {
 	return &UserParser{
-		storage: storage,
-		clients: make(map[uuid.UUID]*http.Client),
-		cookies: make(map[uuid.UUID][]*http.Cookie),
+		clients: make(map[string]*http.Client),
+		cookies: make(map[string][]*http.Cookie),
 	}
 }
 func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*domain.User, error) {
@@ -91,7 +83,6 @@ func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*
 
 	// 4. Заполнение структуры User
 	newUser := domain.User{}
-	newUser.Id = uuid.New()
 	newUser.UserName = username
 	newUser.Registered = true
 
@@ -118,13 +109,9 @@ func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*
 
 	// 5. Сохраняем клиента в кэш хранилища для последующего использования
 	s.mu.Lock()
-	s.clients[newUser.Id] = client
-	s.cookies[newUser.Id] = client.Jar.Cookies(u)
+	s.clients[newUser.UserName] = client
+	s.cookies[newUser.UserName] = client.Jar.Cookies(u)
 	s.mu.Unlock()
-
-	if err := s.storage.SaveUser(ctx, &newUser); err != nil {
-		return nil, err
-	}
 
 	return &newUser, nil
 }
@@ -133,9 +120,9 @@ func DecodeWindows1251(r io.Reader) (io.Reader, error) {
 	return charmap.Windows1251.NewDecoder().Reader(r), nil
 }
 
-func (u *UserParser) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
+func (u *UserParser) GetHttpClien(userName string) (*http.Client, error) {
 	u.mu.Lock()
-	user, ok := u.clients[uuid]
+	user, ok := u.clients[userName]
 	if !ok {
 		return nil, fmt.Errorf("нет такого пользователя")
 	}
@@ -143,5 +130,9 @@ func (u *UserParser) GetHttpClient(uuid uuid.UUID) (*http.Client, error) {
 	return user, nil
 }
 
+func (s *UserParser) GetEstimations(ctx context.Context) (*map[int]domain.Subject, error) {
+	//TODO заполнить получение оценок
+	panic("implement me")
+}
+
 //TODO: сдеать получение предметов по выбору (вектор, freeminor)
-//TODO: получить среднюю оценку

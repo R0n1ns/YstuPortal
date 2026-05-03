@@ -2,8 +2,6 @@ package domain
 
 import (
 	"context"
-
-	"github.com/google/uuid"
 )
 
 //type Group struct {
@@ -12,14 +10,13 @@ import (
 //}
 
 type User struct {
-	Id         uuid.UUID `json:"id"`
-	FirstName  string    `json:"firstname"`
-	LastName   string    `json:"lastname"`
-	Patronymic string    `json:"patronymic"`
-	UserName   string    `json:"username"`
-	Mail       string    `json:"mail"`
-	Password   string    `json:"password"`
-	Registered bool      `json:"registered"`
+	FirstName  string `json:"firstname"`
+	LastName   string `json:"lastname"`
+	Patronymic string `json:"patronymic"`
+	UserName   string `json:"username"`
+	Mail       string `json:"mail"`
+	Password   string `json:"password"`
+	Registered bool   `json:"registered"`
 	//Group       Group           `json:"group"`
 	Group       string          `json:"group"`
 	Estimations map[int]Subject `json:"estimations"`
@@ -27,7 +24,7 @@ type User struct {
 
 type UserPort interface {
 	GetFIO() (FirstName, LastName, Patronymic string)
-	GetId() uuid.UUID
+	GetUserName() string
 	IsReg() bool
 	//GetGroup() Group
 	GetGroup() string

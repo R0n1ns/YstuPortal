@@ -44,10 +44,7 @@ func (u *LoginApi) AuthMiddleware(ctx fiber.Ctx) error {
 	}
 	claims := token.Claims.(*jwt.StandardClaims)
 
-	ctx.Locals("UserId", claims.Issuer)
-
-	//fmt.Println(claims)
-
+	ctx.Locals("UserName", claims.Issuer)
 	return ctx.Next()
 }
 
@@ -73,13 +70,12 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
 		Id:        uuid.New().String(),
-		Issuer:    (*user).Id.String(),
+		Issuer:    (*user).UserName,
 		ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
 	})
 
 	token, err := claims.SignedString([]byte(jwtSecret))
 	if err != nil {
-		//fmt.Println("claims", err)
 		ctx.Status(fiber.StatusInternalServerError)
 		return err
 	}
@@ -91,6 +87,8 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 	})
 	//fmt.Println(data.Name, data.Pass)
 	ctx.SendStatus(fiber.StatusOK)
+	ctx.Locals("UserName", user.UserName)
+
 	return nil
 
 }

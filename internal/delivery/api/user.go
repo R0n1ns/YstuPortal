@@ -4,7 +4,6 @@ import (
 	"YstuPortal/internal/logic"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type UserApi struct {
@@ -16,12 +15,22 @@ func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
 		UserManager: d,
 	}
 	router = router.Group("/user")
-	router.Get("/info", u.UserInfoGet)
+	router.Get("/info", u.GetUserInfo)
 	return &u
 }
 
-func (u UserApi) UserInfoGet(ctx fiber.Ctx) error {
-	user, err := u.UserManager.GetInfo(ctx, uuid.MustParse(ctx.Value("UserId").(string)))
+func (u UserApi) GetUserInfo(ctx fiber.Ctx) error {
+	user, err := u.UserManager.GetInfo(ctx, ctx.Value("UserName").(string))
+	if err != nil {
+		ctx.Status(fiber.StatusInternalServerError)
+		return ctx.JSON(fiber.Map{"error": err.Error()})
+	}
+	ctx.Status(fiber.StatusOK)
+	return ctx.JSON(user)
+}
+
+func (u UserApi) GetUserEstimations(ctx fiber.Ctx) error {
+	user, err := u.UserManager.GetEstimations(ctx, ctx.Value("UserName").(string))
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(fiber.Map{"error": err.Error()})
