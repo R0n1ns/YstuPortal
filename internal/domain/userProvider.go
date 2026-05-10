@@ -4,11 +4,6 @@ import (
 	"context"
 )
 
-//type Group struct {
-//	Id    uuid.UUID
-//	Title string
-//}
-
 type User struct {
 	FirstName  string `json:"firstname"`
 	LastName   string `json:"lastname"`

@@ -27,6 +27,11 @@ func NewUserParser() *UserParser {
 		cookies: make(map[string][]*http.Cookie),
 	}
 }
+func (u *UserParser) Close() {
+	for _, client := range u.clients {
+		client.CloseIdleConnections()
+	}
+}
 func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*domain.User, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -57,7 +62,7 @@ func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*
 	if err != nil {
 		return nil, fmt.Errorf("ошибка запроса: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// 3. Переход в личный кабинет для парсинга данных
 	// После успешного POST нас редиректит, но мы явно запросим страницу ЛК
@@ -66,7 +71,7 @@ func (s *UserParser) AuthUser(ctx context.Context, username, password string) (*
 	if err != nil {
 		return nil, fmt.Errorf("ошибка перехода в ЛК: %w", err)
 	}
-	defer lkResp.Body.Close()
+	defer func() { _ = lkResp.Body.Close() }()
 
 	// Декодируем кодировку вузовского портала
 	utfBody, _ := DecodeWindows1251(lkResp.Body)

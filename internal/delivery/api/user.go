@@ -20,7 +20,11 @@ func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
 }
 
 func (u UserApi) GetUserInfo(ctx fiber.Ctx) error {
-	user, err := u.UserManager.GetInfo(ctx, ctx.Value("UserName").(string))
+	username := ctx.Value("UserName")
+	if username == nil {
+		return ctx.JSON(map[string]string{"error": "Ошибка логина"})
+	}
+	user, err := u.UserManager.GetInfo(ctx, username.(string))
 	if err != nil {
 		ctx.Status(fiber.StatusInternalServerError)
 		return ctx.JSON(fiber.Map{"error": err.Error()})

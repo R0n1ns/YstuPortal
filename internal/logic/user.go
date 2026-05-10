@@ -5,6 +5,12 @@ import (
 	"context"
 )
 
+type UserManagerType interface {
+	Login(ctx context.Context, username, password string) (*domain.User, error)
+	GetInfo(ctx context.Context, userName string) (*domain.User, error)
+	GetEstimations(ctx context.Context, userName string) (map[int]domain.Subject, error)
+}
+
 type UserManager struct {
 	UserProvider domain.UserProvider
 	UserStorage  domain.UserStorage
@@ -28,6 +34,7 @@ func (u UserManager) Login(ctx context.Context, username, password string) (*dom
 
 	err = u.UserStorage.SaveUser(ctx, user)
 	if err != nil {
+
 		return nil, err
 	}
 

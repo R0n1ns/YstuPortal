@@ -16,12 +16,12 @@ type LoginApi struct {
 
 var jwtSecret = "test"
 
-func NewLoginApi(router fiber.Router, manager logic.UserManager) *LoginApi {
+func NewLoginApi(r fiber.Router, manager logic.UserManager) *LoginApi {
 	mngr := &LoginApi{DataManager: manager}
-	router = router.Group("/auth")
+	router := r.Group("/auth")
 	router.Post("/login", mngr.LoginPost)
 	router.Post("/logout", mngr.LogoutPost)
-	router.Use(mngr.AuthMiddleware)
+	r.Use(mngr.AuthMiddleware)
 	return mngr
 }
 
@@ -86,7 +86,7 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 		HTTPOnly: true,
 	})
 	//fmt.Println(data.Name, data.Pass)
-	ctx.SendStatus(fiber.StatusOK)
+	_ = ctx.SendStatus(fiber.StatusOK)
 	ctx.Locals("UserName", user.UserName)
 
 	return nil
@@ -95,7 +95,7 @@ func (u *LoginApi) LoginPost(ctx fiber.Ctx) error {
 
 func (u *LoginApi) LogoutPost(ctx fiber.Ctx) error {
 	ctx.ClearCookie()
-	ctx.SendStatus(fiber.StatusOK)
+	_ = ctx.SendStatus(fiber.StatusOK)
 	return nil
 
 }

@@ -12,8 +12,10 @@ import (
 )
 
 func main() {
-	storage := db.NewUserStorage()
+	storage := db.NewUserStorage("postgres://user:user@localhost:5432/ystu_db")
+	defer storage.Close()
 	parser := userProvider.NewUserParser()
+	defer parser.Close()
 	dataManager, _ := logic.NewUserManager(parser, storage)
 
 	app := fiber.New()
@@ -29,5 +31,5 @@ func main() {
 	_ = api.NewLoginApi(r, *dataManager)
 	_ = api.NewUserApi(r, *dataManager)
 
-	app.Listen(":8080")
+	_ = app.Listen(":8080")
 }
