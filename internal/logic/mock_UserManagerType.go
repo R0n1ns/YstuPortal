@@ -15,23 +15,23 @@ type MockUserManagerType struct {
 }
 
 // GetEstimations provides a mock function with given fields: ctx, userName
-func (_m *MockUserManagerType) GetEstimations(ctx context.Context, userName string) (map[int]domain.Subject, error) {
+func (_m *MockUserManagerType) GetEstimations(ctx context.Context, userName string) ([]domain.Subject, error) {
 	ret := _m.Called(ctx, userName)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEstimations")
 	}
 
-	var r0 map[int]domain.Subject
+	var r0 []domain.Subject
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (map[int]domain.Subject, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]domain.Subject, error)); ok {
 		return rf(ctx, userName)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) map[int]domain.Subject); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) []domain.Subject); ok {
 		r0 = rf(ctx, userName)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[int]domain.Subject)
+			r0 = ret.Get(0).([]domain.Subject)
 		}
 	}
 

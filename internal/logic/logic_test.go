@@ -12,7 +12,7 @@ import (
 
 func TestCorrectLogin(t *testing.T) {
 	mockProvider := domain.NewMockUserProvider(t)
-	mockProvider.On("AuthUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
+	mockProvider.On("GetUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
 	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)
@@ -42,7 +42,7 @@ func TestWrongLogin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockProvider := domain.NewMockUserProvider(t)
 
-			mockProvider.On("AuthUser", mock.Anything, tc.login, tc.pass).Return((*domain.User)(nil), errors.New("invalid creds"))
+			mockProvider.On("GetUser", mock.Anything, tc.login, tc.pass).Return((*domain.User)(nil), errors.New("invalid creds"))
 
 			mockStorage := domain.NewMockUserStorage(t)
 
@@ -61,7 +61,7 @@ func TestWrongLogin(t *testing.T) {
 
 func TestCtxErrLogin(t *testing.T) {
 	mockProvider := domain.NewMockUserProvider(t)
-	mockProvider.On("AuthUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
+	mockProvider.On("GetUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
 	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)
@@ -86,8 +86,8 @@ func TestCtxErrLogin(t *testing.T) {
 
 func TestStorageErrLogin(t *testing.T) {
 	mockProvider := domain.NewMockUserProvider(t)
-	mockProvider.On("AuthUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
-	mockProvider.On("AuthUser", mock.Anything, "err", "err").Return(&domain.User{UserName: "err"}, nil)
+	mockProvider.On("GetUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
+	mockProvider.On("GetUser", mock.Anything, "err", "err").Return(&domain.User{UserName: "err"}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
 	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)

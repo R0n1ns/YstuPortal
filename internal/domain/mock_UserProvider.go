@@ -13,12 +13,12 @@ type MockUserProvider struct {
 	mock.Mock
 }
 
-// AuthUser provides a mock function with given fields: ctx, username, password
-func (_m *MockUserProvider) AuthUser(ctx context.Context, username string, password string) (*User, error) {
+// GetUser provides a mock function with given fields: ctx, username, password
+func (_m *MockUserProvider) GetUser(ctx context.Context, username string, password string) (*User, error) {
 	ret := _m.Called(ctx, username, password)
 
 	if len(ret) == 0 {
-		panic("no return value specified for AuthUser")
+		panic("no return value specified for GetUser")
 	}
 
 	var r0 *User
@@ -44,23 +44,23 @@ func (_m *MockUserProvider) AuthUser(ctx context.Context, username string, passw
 }
 
 // GetEstimations provides a mock function with given fields: ctx
-func (_m *MockUserProvider) GetEstimations(ctx context.Context) (*map[int]Subject, error) {
+func (_m *MockUserProvider) GetEstimations(ctx context.Context) (*[]Subject, error) {
 	ret := _m.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetEstimations")
 	}
 
-	var r0 *map[int]Subject
+	var r0 *[]Subject
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*map[int]Subject, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) (*[]Subject, error)); ok {
 		return rf(ctx)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *map[int]Subject); ok {
+	if rf, ok := ret.Get(0).(func(context.Context) *[]Subject); ok {
 		r0 = rf(ctx)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*map[int]Subject)
+			r0 = ret.Get(0).(*[]Subject)
 		}
 	}
 

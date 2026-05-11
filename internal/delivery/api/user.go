@@ -16,6 +16,7 @@ func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
 	}
 	router = router.Group("/user")
 	router.Get("/info", u.GetUserInfo)
+	router.Get("/estimations", u.GetUserEstimations)
 	return &u
 }
 

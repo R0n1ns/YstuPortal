@@ -13,8 +13,8 @@ type User struct {
 	Password   string `json:"password"`
 	Registered bool   `json:"registered"`
 	//Group       Group           `json:"group"`
-	Group       string          `json:"group"`
-	Estimations map[int]Subject `json:"estimations"`
+	Group       string    `json:"group"`
+	Estimations []Subject `json:"estimations"`
 }
 
 type UserPort interface {
@@ -23,13 +23,13 @@ type UserPort interface {
 	IsReg() bool
 	//GetGroup() Group
 	GetGroup() string
-	GetEstimations() map[int]Subject
+	GetEstimations() []Subject
 	SetGroup(string) bool
 }
 
 type UserProvider interface {
-	AuthUser(ctx context.Context, username, password string) (*User, error)
-	GetEstimations(ctx context.Context) (*map[int]Subject, error)
+	GetUser(ctx context.Context, username, password string) (*User, error)
+	GetEstimations(ctx context.Context) (*[]Subject, error)
 }
 
 //TODO: реализовать добавление в группу :при регистрации пользователя в приложении , проверять его группу и составлять автомтически
