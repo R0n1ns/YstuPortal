@@ -5,6 +5,7 @@ import (
 	"YstuPortal/internal/logic"
 	"YstuPortal/internal/repository/userProvider"
 	"YstuPortal/internal/repository/userStorage/db"
+	"os"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -12,7 +13,11 @@ import (
 )
 
 func main() {
-	storage := db.NewUserStorage("postgres://user:user@localhost:5432/ystu_db")
+	pgURL := os.Getenv("DATABASE_URL")
+	if pgURL == "" {
+		pgURL = "postgres://user:user@localhost:5432/ystu_db?sslmode=disable"
+	}
+	storage := db.NewUserStorage(pgURL)
 	defer storage.Close()
 	parser := userProvider.NewUserParser()
 	defer parser.Close()

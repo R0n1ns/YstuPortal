@@ -29,4 +29,10 @@ services:
     ports:
       - "8080:8080"
 
+    environment:
+      DATABASE_URL: "postgres://user:user@postgres:5432/ystu_db?sslmode=disable"
+
+    depends_on:
+      - postgres
+
     restart: unless-stopped
