@@ -1,40 +1,50 @@
 package main
 
 import (
-	"YstuPortal/internal/delivery/api"
+	"YstuPortal/internal/config"
 	"YstuPortal/internal/logic"
+	"YstuPortal/internal/repository/cache/redis"
 	"YstuPortal/internal/repository/userProvider"
 	"YstuPortal/internal/repository/userStorage/db"
-	"os"
-
-	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/cors"
-	"github.com/gofiber/fiber/v3/middleware/logger"
+	"YstuPortal/internal/server"
+	"log"
 )
 
 func main() {
-	pgURL := os.Getenv("DATABASE_URL")
-	if pgURL == "" {
-		pgURL = "postgres://user:user@localhost:5432/ystu_db?sslmode=disable"
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
 	}
-	storage := db.NewUserStorage(pgURL)
+
+	storage := db.NewUserStorage(cfg.DatabaseURL)
 	defer storage.Close()
 	parser := userProvider.NewUserParser()
 	defer parser.Close()
-	dataManager, _ := logic.NewUserManager(parser, storage)
 
-	app := fiber.New()
-	app.Use(logger.New())
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:8080", "http://127.0.0.1:8080"},
-		AllowMethods:     []string{"GET", "POST", "HEAD", "PUT", "DELETE", "PATCH"},
-		AllowHeaders:     []string{"Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
-	r := fiber.Router.Group(app, "/api/")
-	_ = api.NewLoginApi(r, *dataManager)
-	_ = api.NewUserApi(r, *dataManager)
+	var cache logic.EstimationsCache
+	if cfg.RedisURL != "" {
+		redisCache, err := redis.NewEstimationsCache(cfg.RedisURL)
+		if err != nil {
+			log.Printf("redis cache disabled: %v", err)
+		} else {
+			cache = redisCache
+			defer func() { _ = redisCache.Close() }()
+		}
+	}
 
-	_ = app.Listen(":8080")
+	var dataManager *logic.UserManager
+	if cache != nil {
+		dataManager, err = logic.NewUserManagerWithCache(parser, storage, cache, cfg.CacheTTL)
+	} else {
+		dataManager, err = logic.NewUserManager(parser, storage)
+	}
+	if err != nil {
+		log.Fatalf("init user manager: %v", err)
+	}
+
+	app := server.New(cfg, *dataManager)
+
+	if err := app.Listen(":" + cfg.Port); err != nil {
+		log.Fatalf("listen: %v", err)
+	}
 }

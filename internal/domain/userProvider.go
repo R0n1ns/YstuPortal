@@ -12,6 +12,7 @@ type User struct {
 	Mail       string `json:"mail"`
 	Password   string `json:"password"`
 	Registered bool   `json:"registered"`
+	Role       string `json:"role"`
 	//Group       Group           `json:"group"`
 	Group       string    `json:"group"`
 	Estimations []Subject `json:"estimations"`

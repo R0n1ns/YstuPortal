@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -15,7 +16,6 @@ type UserStorage struct {
 }
 
 func NewUserStorage(pgUrl string) *UserStorage {
-
 	pool, err := pgxpool.New(context.Background(), pgUrl)
 	if err != nil {
 		panic(fmt.Errorf("неправильные настройки подключения к бд %s", err))
@@ -23,78 +23,6 @@ func NewUserStorage(pgUrl string) *UserStorage {
 	err = pool.Ping(context.Background())
 	if err != nil {
 		panic(fmt.Errorf("не удалось подлкючиться к бд %s", err))
-	}
-	_, err = pool.Exec(context.Background(), `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Users with role + role-specific nullable fields
-CREATE TABLE users (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    firstname text NOT NULL,
-    lastname text NOT NULL,
-    patronymic text,
-    username text NOT NULL UNIQUE,
-    mail text NOT NULL UNIQUE,
-    password_hash text NOT NULL,
-    registered boolean NOT NULL DEFAULT false,
-    role text NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
-    "group" text,
-    course int,
-    academic_title text,
-    department text
-);
-
-CREATE TABLE subjects (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title text NOT NULL,
-    description text
-);
-
-CREATE TABLE subject_control (
-    subject_id uuid NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-    type_of_control text NOT NULL,
-    zed int NOT NULL DEFAULT 0,
-    PRIMARY KEY (subject_id, type_of_control)
-);
-
-CREATE TABLE lessons (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    subject_id uuid NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
-    teacher_id uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    start_time timestamptz NOT NULL,
-    end_time timestamptz NOT NULL,
-    room text
-);
-
-CREATE TABLE enrollments (
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subject_id uuid NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
-    PRIMARY KEY (user_id, subject_id)
-);
-
-CREATE TABLE grades (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subject_id uuid NOT NULL REFERENCES subjects(id) ON DELETE RESTRICT,
-    semester int NOT NULL DEFAULT 0,
-    course int NOT NULL DEFAULT 0,
-    type_of_control text NOT NULL DEFAULT '',
-    score text NOT NULL DEFAULT '',
-    evaluation text NOT NULL DEFAULT '',
-    diploma boolean NOT NULL DEFAULT false,
-    FOREIGN KEY (subject_id, type_of_control)
-        REFERENCES subject_control(subject_id, type_of_control),
-    UNIQUE (user_id, subject_id, semester, course, type_of_control)
-);
-
-CREATE INDEX IF NOT EXISTS idx_lessons_start_time ON lessons(start_time);
-CREATE INDEX IF NOT EXISTS idx_lessons_teacher ON lessons(teacher_id);
-CREATE INDEX IF NOT EXISTS idx_grades_user ON grades(user_id);
-CREATE INDEX IF NOT EXISTS idx_grades_subject ON grades(subject_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_user ON enrollments(user_id);
-CREATE INDEX IF NOT EXISTS idx_enrollments_subject ON enrollments(subject_id);
-`)
-	if err != nil {
-		panic(fmt.Errorf("ошибка во время создания таблиц бд %s", err))
 	}
 
 	return &UserStorage{
@@ -117,52 +45,46 @@ func (u *UserStorage) GetUser(ctx context.Context, userName string) (*domain.Use
 	//}
 	//u.mu.Unlock()
 	newUser := domain.User{}
+	var userID uuid.UUID
 	query := `
-       SELECT firstname, lastname, patronymic, username, mail,password_hash,registered,"group"
+       SELECT id, firstname, lastname, patronymic, username, mail, password_hash, registered, "group", role
         FROM users
         WHERE username = $1;
 `
-	userRow, err := u.pgPool.Query(ctx, query, userName)
+	err := u.pgPool.QueryRow(ctx, query, userName).Scan(
+		&userID,
+		&newUser.FirstName,
+		&newUser.LastName,
+		&newUser.Patronymic,
+		&newUser.UserName,
+		&newUser.Mail,
+		&newUser.Password,
+		&newUser.Registered,
+		&newUser.Group,
+		&newUser.Role,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	defer userRow.Close()
-	for userRow.Next() {
-		err = userRow.Scan(
-			&newUser.FirstName,
-			&newUser.LastName,
-			&newUser.Patronymic,
-			&newUser.UserName,
-			&newUser.Mail,
-			&newUser.Password,
-			&newUser.Registered,
-			&newUser.Group,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if newUser.UserName == "" {
-		return nil, fmt.Errorf("пользователь не неайден")
-	}
-
 	query = `
-       SELECT number, semester, course, title, type_of_control, zed, evaluation, score, diploma
-        FROM user_estimations
-        WHERE user_name = $1;
+       SELECT g.semester, g.course, s.title, g.type_of_control, sc.zed, g.evaluation, g.score, g.diploma
+        FROM grades g
+        JOIN subjects s ON s.id = g.subject_id
+        LEFT JOIN subject_control sc
+            ON sc.subject_id = g.subject_id AND sc.type_of_control = g.type_of_control
+        WHERE g.user_id = $1;
 `
-	userRow, err = u.pgPool.Query(ctx, query, userName)
+	userRow, err := u.pgPool.Query(ctx, query, userID)
 	if err != nil {
 		return &newUser, err
 	}
-
 	defer userRow.Close()
-	subject := []domain.Subject{}
+
+	subjects := make([]domain.Subject, 0)
 	for userRow.Next() {
 		subj := domain.Subject{}
 		err = userRow.Scan(
-			&subj.Mark,
 			&subj.Semester,
 			&subj.Course,
 			&subj.Title,
@@ -175,9 +97,9 @@ func (u *UserStorage) GetUser(ctx context.Context, userName string) (*domain.Use
 		if err != nil {
 			continue
 		}
-		subject = append(subject, subj)
+		subjects = append(subjects, subj)
 	}
-	newUser.Estimations = subject
+	newUser.Estimations = subjects
 	return &newUser, nil
 }
 func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
@@ -188,11 +110,25 @@ func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
 	//u.mu.Lock()
 	//u.users[user.UserName] = user
 	//u.mu.Unlock()
+	tx, err := u.pgPool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("ошибка начала транзакции: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	role := user.Role
+	if role == "" {
+		role = "student"
+	}
 	query := `
-       INSERT INTO users (firstname, lastname, patronymic, username, mail,password_hash,registered,"group") 
-       VALUES ($1, $2, $3, $4, $5,$6,$7,$8);
+       INSERT INTO users (firstname, lastname, patronymic, username, mail, password_hash, registered, "group", role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id;
 `
-	_, err := u.pgPool.Query(ctx, query,
+	var userID uuid.UUID
+	err = tx.QueryRow(ctx, query,
 		user.FirstName,
 		user.LastName,
 		user.Patronymic,
@@ -200,32 +136,58 @@ func (u *UserStorage) SaveUser(ctx context.Context, user *domain.User) error {
 		user.Mail,
 		user.Password,
 		user.Registered,
-		user.Group)
+		user.Group,
+		role,
+	).Scan(&userID)
 	if err != nil {
 		return fmt.Errorf("ошибка создания пользователя: %w", err)
 	}
+
 	if user.Estimations != nil {
-		query := `
-       INSERT INTO user_estimations (user_name, number, semester, course, title, type_of_control, zed, evaluation, score, diploma)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+		querySubject := `
+       INSERT INTO subjects (title, description)
+       VALUES ($1, $2)
+       RETURNING id;
 `
-		for number, subject := range user.Estimations {
-			_, err = u.pgPool.Exec(ctx, query,
-				user.UserName,
-				number,
+		querySubjectControl := `
+       INSERT INTO subject_control (subject_id, type_of_control, zed)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (subject_id, type_of_control) DO UPDATE SET zed = EXCLUDED.zed;
+`
+		queryGrade := `
+       INSERT INTO grades (user_id, subject_id, semester, course, type_of_control, score, evaluation, diploma)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (user_id, subject_id, semester, course, type_of_control)
+       DO UPDATE SET score = EXCLUDED.score, evaluation = EXCLUDED.evaluation, diploma = EXCLUDED.diploma;
+`
+		for _, subject := range user.Estimations {
+			var subjectID uuid.UUID
+			err = tx.QueryRow(ctx, querySubject, subject.Title, "").Scan(&subjectID)
+			if err != nil {
+				return fmt.Errorf("ошибка создания предмета: %w", err)
+			}
+			_, err = tx.Exec(ctx, querySubjectControl, subjectID, subject.TypeOfControl, subject.Zed)
+			if err != nil {
+				return fmt.Errorf("ошибка создания контроля: %w", err)
+			}
+			_, err = tx.Exec(ctx, queryGrade,
+				userID,
+				subjectID,
 				subject.Semester,
 				subject.Course,
-				subject.Title,
 				subject.TypeOfControl,
-				subject.Zed,
-				subject.Evaluation,
 				subject.Mark,
+				subject.Evaluation,
 				subject.Diploma,
 			)
 			if err != nil {
 				return fmt.Errorf("ошибка создания оценок: %w", err)
 			}
 		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return fmt.Errorf("ошибка фиксации транзакции: %w", err)
 	}
 	return nil
 }

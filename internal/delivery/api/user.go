@@ -17,29 +17,36 @@ func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
 	router = router.Group("/user")
 	router.Get("/info", u.GetUserInfo)
 	router.Get("/estimations", u.GetUserEstimations)
+	router.Get("/admin/ping", RequireRole("admin"), u.AdminPing)
 	return &u
 }
 
 func (u UserApi) GetUserInfo(ctx fiber.Ctx) error {
-	username := ctx.Value("UserName")
-	if username == nil {
-		return ctx.JSON(map[string]string{"error": "Ошибка логина"})
+	username, _ := ctx.Locals("UserName").(string)
+	if username == "" {
+		return WriteError(ctx, fiber.StatusUnauthorized, "unauthorized", "not authorized")
 	}
-	user, err := u.UserManager.GetInfo(ctx, username.(string))
+	user, err := u.UserManager.GetInfo(ctx, username)
 	if err != nil {
-		ctx.Status(fiber.StatusInternalServerError)
-		return ctx.JSON(fiber.Map{"error": err.Error()})
+		return WriteError(ctx, fiber.StatusInternalServerError, "internal", "failed to load user info")
 	}
 	ctx.Status(fiber.StatusOK)
 	return ctx.JSON(user)
 }
 
 func (u UserApi) GetUserEstimations(ctx fiber.Ctx) error {
-	user, err := u.UserManager.GetEstimations(ctx, ctx.Value("UserName").(string))
+	username, _ := ctx.Locals("UserName").(string)
+	if username == "" {
+		return WriteError(ctx, fiber.StatusUnauthorized, "unauthorized", "not authorized")
+	}
+	user, err := u.UserManager.GetEstimations(ctx, username)
 	if err != nil {
-		ctx.Status(fiber.StatusInternalServerError)
-		return ctx.JSON(fiber.Map{"error": err.Error()})
+		return WriteError(ctx, fiber.StatusInternalServerError, "internal", "failed to load estimations")
 	}
 	ctx.Status(fiber.StatusOK)
 	return ctx.JSON(user)
+}
+
+func (u UserApi) AdminPing(ctx fiber.Ctx) error {
+	return ctx.JSON(fiber.Map{"status": "ok"})
 }

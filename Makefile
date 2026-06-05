@@ -10,6 +10,15 @@ lint:
 test:
 	go test ./...
 
+migrate-up:
+	go run ./cmd/migrate/main.go -direction up
+
+migrate-down:
+	go run ./cmd/migrate/main.go -direction down -steps 1
+
+migrate-version:
+	go run ./cmd/migrate/main.go -direction version
+
 build-race:
 	go build -race ./...
 

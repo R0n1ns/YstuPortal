@@ -15,7 +15,7 @@ func TestCorrectLogin(t *testing.T) {
 	mockProvider.On("GetUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
-	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)
+	mockStorage.On("SaveUser", mock.Anything, &domain.User{Role: "student"}).Return(nil)
 
 	userManager, err := NewUserManager(mockProvider, mockStorage)
 	require.NoError(t, err)
@@ -64,7 +64,7 @@ func TestCtxErrLogin(t *testing.T) {
 	mockProvider.On("GetUser", mock.Anything, "user", "pass").Return(&domain.User{}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
-	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)
+	mockStorage.On("SaveUser", mock.Anything, &domain.User{Role: "student"}).Return(nil)
 
 	userManager, err := NewUserManager(mockProvider, mockStorage)
 	require.NoError(t, err)
@@ -90,8 +90,8 @@ func TestStorageErrLogin(t *testing.T) {
 	mockProvider.On("GetUser", mock.Anything, "err", "err").Return(&domain.User{UserName: "err"}, nil)
 
 	mockStorage := domain.NewMockUserStorage(t)
-	mockStorage.On("SaveUser", mock.Anything, &domain.User{}).Return(nil)
-	mockStorage.On("SaveUser", mock.Anything, &domain.User{UserName: "err"}).Return(errors.New("invalid storage"))
+	mockStorage.On("SaveUser", mock.Anything, &domain.User{Role: "student"}).Return(nil)
+	mockStorage.On("SaveUser", mock.Anything, &domain.User{UserName: "err", Role: "student"}).Return(errors.New("invalid storage"))
 
 	userManager, err := NewUserManager(mockProvider, mockStorage)
 	require.NoError(t, err)

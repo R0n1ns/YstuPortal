@@ -19,6 +19,11 @@ services:
     ports:
       - "5432:5432"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
   app:
     build:
       context: .
@@ -29,10 +34,17 @@ services:
     ports:
       - "8080:8080"
 
+    env_file:
+      - .env
+
     environment:
-      DATABASE_URL: "postgres://user:user@postgres:5432/ystu_db?sslmode=disable"
+      DATABASE_URL: ${DATABASE_URL:-postgres://user:user@postgres:5432/ystu_db?sslmode=disable}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      PORT: ${PORT:-8080}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
 
     depends_on:
       - postgres
+      - redis
 
     restart: unless-stopped

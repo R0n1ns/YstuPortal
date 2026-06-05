@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: YstuPortal API
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "403":
+          description: Forbidden
+  /auth/logout:
+    post:
+      summary: Logout
+      responses:
+        "200":
+          description: OK
+  /user/info:
+    get:
+      summary: Get user info
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+  /user/estimations:
+    get:
+      summary: Get estimations
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+  /user/admin/ping:
+    get:
+      summary: Admin ping
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: OK
+        "403":
+          description: Forbidden
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: jwt
+
