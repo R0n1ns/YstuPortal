@@ -6,8 +6,7 @@ CREATE TABLE users (
     lastname text NOT NULL,
     patronymic text,
     username text NOT NULL UNIQUE,
-    mail text NOT NULL UNIQUE,
-    password_hash text NOT NULL,
+    mail text UNIQUE,
     registered boolean NOT NULL DEFAULT false,
     role text NOT NULL CHECK (role IN ('student', 'teacher', 'admin')),
     "group" text,
@@ -18,7 +17,7 @@ CREATE TABLE users (
 
 CREATE TABLE subjects (
     id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title text NOT NULL,
+    title text NOT NULL UNIQUE,
     description text
 );
 

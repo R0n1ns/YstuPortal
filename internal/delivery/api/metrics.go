@@ -34,9 +34,15 @@ func (m *Metrics) Middleware() fiber.Handler {
 		m.inFlight.Add(-1)
 
 		status := ctx.Response().StatusCode()
+		if err != nil {
+			status = fiber.StatusInternalServerError
+			if fiberErr, ok := err.(*fiber.Error); ok {
+				status = fiberErr.Code
+			}
+		}
 		m.totalRequests.Add(1)
 		m.totalDurationNs.Add(uint64(duration.Nanoseconds()))
-		if status >= 500 {
+		if status >= 400 {
 			m.totalErrors.Add(1)
 		}
 

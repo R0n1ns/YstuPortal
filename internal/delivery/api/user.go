@@ -1,52 +1,71 @@
 package api
 
 import (
-	"YstuPortal/internal/logic"
+	"errors"
+
+	"github.com/R0n1ns/YstuPortal/internal/domain"
+	"github.com/R0n1ns/YstuPortal/internal/logic"
 
 	"github.com/gofiber/fiber/v3"
 )
 
-type UserApi struct {
-	UserManager logic.UserManager
+type UserAPI struct {
+	manager logic.UserManagerType
 }
 
-func NewUserApi(router fiber.Router, d logic.UserManager) *UserApi {
-	u := UserApi{
-		UserManager: d,
-	}
-	router = router.Group("/user")
-	router.Get("/info", u.GetUserInfo)
-	router.Get("/estimations", u.GetUserEstimations)
-	router.Get("/admin/ping", RequireRole("admin"), u.AdminPing)
-	return &u
+type userResponse struct {
+	FirstName  string `json:"first_name"`
+	LastName   string `json:"last_name"`
+	Patronymic string `json:"patronymic,omitempty"`
+	UserName   string `json:"username"`
+	Mail       string `json:"mail,omitempty"`
+	Registered bool   `json:"registered"`
+	Role       string `json:"role"`
+	Group      string `json:"group,omitempty"`
 }
 
-func (u UserApi) GetUserInfo(ctx fiber.Ctx) error {
-	username, _ := ctx.Locals("UserName").(string)
-	if username == "" {
-		return WriteError(ctx, fiber.StatusUnauthorized, "unauthorized", "not authorized")
-	}
-	user, err := u.UserManager.GetInfo(ctx, username)
+func NewUserAPI(router fiber.Router, manager logic.UserManagerType) *UserAPI {
+	api := &UserAPI{manager: manager}
+	user := router.Group("/user")
+	user.Get("/info", api.GetUserInfo)
+	user.Get("/grades", api.GetUserGrades)
+	user.Get("/admin/ping", RequireRole("admin"), api.AdminPing)
+	return api
+}
+
+func (api *UserAPI) GetUserInfo(ctx fiber.Ctx) error {
+	userName, _ := ctx.Locals(userNameLocal).(string)
+	user, err := api.manager.GetInfo(ctx, userName)
 	if err != nil {
-		return WriteError(ctx, fiber.StatusInternalServerError, "internal", "failed to load user info")
+		return writeUserError(ctx, err)
 	}
-	ctx.Status(fiber.StatusOK)
-	return ctx.JSON(user)
+	return ctx.JSON(userResponse{
+		FirstName: user.FirstName, LastName: user.LastName, Patronymic: user.Patronymic,
+		UserName: user.UserName, Mail: user.Mail, Registered: user.Registered,
+		Role: user.Role, Group: user.Group,
+	})
 }
 
-func (u UserApi) GetUserEstimations(ctx fiber.Ctx) error {
-	username, _ := ctx.Locals("UserName").(string)
-	if username == "" {
-		return WriteError(ctx, fiber.StatusUnauthorized, "unauthorized", "not authorized")
-	}
-	user, err := u.UserManager.GetEstimations(ctx, username)
+func (api *UserAPI) GetUserGrades(ctx fiber.Ctx) error {
+	userName, _ := ctx.Locals(userNameLocal).(string)
+	grades, err := api.manager.GetGrades(ctx, userName)
 	if err != nil {
-		return WriteError(ctx, fiber.StatusInternalServerError, "internal", "failed to load estimations")
+		return writeUserError(ctx, err)
 	}
-	ctx.Status(fiber.StatusOK)
-	return ctx.JSON(user)
+	return ctx.JSON(grades)
 }
 
-func (u UserApi) AdminPing(ctx fiber.Ctx) error {
+func (api *UserAPI) AdminPing(ctx fiber.Ctx) error {
 	return ctx.JSON(fiber.Map{"status": "ok"})
+}
+
+func writeUserError(ctx fiber.Ctx, err error) error {
+	switch {
+	case errors.Is(err, domain.ErrUserNotFound):
+		return WriteError(ctx, fiber.StatusNotFound, "user_not_found", "user not found")
+	case errors.Is(err, domain.ErrSessionNotFound):
+		return WriteError(ctx, fiber.StatusConflict, "session_expired", "sign in again to refresh data")
+	default:
+		return WriteError(ctx, fiber.StatusInternalServerError, "internal", "failed to load user data")
+	}
 }

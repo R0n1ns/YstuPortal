@@ -43,29 +43,27 @@ func (_m *MockUserProvider) GetUser(ctx context.Context, username string, passwo
 	return r0, r1
 }
 
-// GetEstimations provides a mock function with given fields: ctx
-func (_m *MockUserProvider) GetEstimations(ctx context.Context) (*[]Subject, error) {
-	ret := _m.Called(ctx)
+// GetGrades provides a mock function with given fields: ctx, username
+func (_m *MockUserProvider) GetGrades(ctx context.Context, username string) ([]Subject, error) {
+	ret := _m.Called(ctx, username)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetEstimations")
+		panic("no return value specified for GetGrades")
 	}
 
-	var r0 *[]Subject
+	var r0 []Subject
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (*[]Subject, error)); ok {
-		return rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]Subject, error)); ok {
+		return rf(ctx, username)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context) *[]Subject); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, string) []Subject); ok {
+		r0 = rf(ctx, username)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*[]Subject)
-		}
+		r0 = ret.Get(0).([]Subject)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, username)
 	} else {
 		r1 = ret.Error(1)
 	}

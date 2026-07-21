@@ -1,9 +1,9 @@
 package server
 
 import (
-	"YstuPortal/internal/config"
-	"YstuPortal/internal/delivery/api"
-	"YstuPortal/internal/logic"
+	"github.com/R0n1ns/YstuPortal/internal/config"
+	"github.com/R0n1ns/YstuPortal/internal/delivery/api"
+	"github.com/R0n1ns/YstuPortal/internal/logic"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -11,10 +11,16 @@ import (
 	"github.com/gofiber/fiber/v3/middleware/requestid"
 )
 
-func New(cfg config.Config, manager logic.UserManager) *fiber.App {
+func New(cfg config.Config, manager logic.UserManagerType) *fiber.App {
 	metrics := api.NewMetrics()
 
-	app := fiber.New(fiber.Config{ErrorHandler: api.ErrorHandler})
+	app := fiber.New(fiber.Config{
+		ErrorHandler: api.ErrorHandler,
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
+		BodyLimit:    1 * 1024 * 1024,
+	})
 	app.Use(requestid.New(requestid.Config{
 		Header: "X-Request-ID",
 	}))
@@ -32,10 +38,15 @@ func New(cfg config.Config, manager logic.UserManager) *fiber.App {
 
 	api.RegisterSwagger(app, cfg.SwaggerEnabled)
 	app.Get("/metrics", metrics.Handler())
+	app.Get("/health/live", func(ctx fiber.Ctx) error {
+		return ctx.JSON(fiber.Map{"status": "ok"})
+	})
 
 	r := app.Group("/api")
-	_ = api.NewLoginApi(r, manager, cfg)
-	_ = api.NewUserApi(r, manager)
+	loginAPI := api.NewLoginAPI(r, manager, cfg)
+	protected := r.Group("", loginAPI.AuthMiddleware)
+	loginAPI.RegisterProtected(protected)
+	_ = api.NewUserAPI(protected, manager)
 
 	return app
 }

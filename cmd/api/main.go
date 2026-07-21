@@ -1,50 +1,96 @@
 package main
 
 import (
-	"YstuPortal/internal/config"
-	"YstuPortal/internal/logic"
-	"YstuPortal/internal/repository/cache/redis"
-	"YstuPortal/internal/repository/userProvider"
-	"YstuPortal/internal/repository/userStorage/db"
-	"YstuPortal/internal/server"
+	"context"
+	"errors"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/R0n1ns/YstuPortal/internal/config"
+	"github.com/R0n1ns/YstuPortal/internal/domain"
+	"github.com/R0n1ns/YstuPortal/internal/logic"
+	"github.com/R0n1ns/YstuPortal/internal/repository/cache/redis"
+	"github.com/R0n1ns/YstuPortal/internal/repository/userProvider"
+	"github.com/R0n1ns/YstuPortal/internal/repository/userStorage/db"
+	"github.com/R0n1ns/YstuPortal/internal/server"
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Printf("application stopped: %v", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		return err
 	}
 
-	storage := db.NewUserStorage(cfg.DatabaseURL)
+	startupCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	storage, err := db.NewUserStorage(startupCtx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
 	defer storage.Close()
-	parser := userProvider.NewUserParser()
-	defer parser.Close()
 
-	var cache logic.EstimationsCache
+	var provider domain.UserProvider
+	if cfg.DemoMode {
+		log.Print("demo provider enabled")
+		provider = userProvider.NewDemoProvider()
+	} else {
+		parser := userProvider.NewUserParser(
+			cfg.UpstreamBaseURL,
+			cfg.UpstreamCode,
+			cfg.UpstreamTimeout,
+			cfg.SessionTTL,
+		)
+		defer parser.Close()
+		provider = parser
+	}
+
+	var manager *logic.UserManager
 	if cfg.RedisURL != "" {
-		redisCache, err := redis.NewEstimationsCache(cfg.RedisURL)
-		if err != nil {
-			log.Printf("redis cache disabled: %v", err)
+		cache, cacheErr := redis.NewGradesCache(cfg.RedisURL)
+		if cacheErr != nil {
+			log.Printf("redis cache disabled: %v", cacheErr)
 		} else {
-			cache = redisCache
-			defer func() { _ = redisCache.Close() }()
+			defer func() { _ = cache.Close() }()
+			manager, err = logic.NewUserManagerWithCache(provider, storage, cache, cfg.CacheTTL)
 		}
 	}
-
-	var dataManager *logic.UserManager
-	if cache != nil {
-		dataManager, err = logic.NewUserManagerWithCache(parser, storage, cache, cfg.CacheTTL)
-	} else {
-		dataManager, err = logic.NewUserManager(parser, storage)
+	if manager == nil && err == nil {
+		manager, err = logic.NewUserManager(provider, storage)
 	}
 	if err != nil {
-		log.Fatalf("init user manager: %v", err)
+		return err
 	}
 
-	app := server.New(cfg, *dataManager)
+	app := server.New(cfg, manager)
+	errCh := make(chan error, 1)
+	go func() {
+		log.Printf("HTTP server listening on :%s", cfg.Port)
+		errCh <- app.Listen(":" + cfg.Port)
+	}()
 
-	if err := app.Listen(":" + cfg.Port); err != nil {
-		log.Fatalf("listen: %v", err)
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	select {
+	case <-shutdownCtx.Done():
+		log.Print("shutting down HTTP server")
+		if err := app.Shutdown(); err != nil {
+			return err
+		}
+		return nil
+	case err := <-errCh:
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return err
 	}
 }

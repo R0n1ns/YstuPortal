@@ -1,7 +1,6 @@
 package userProvider
 
 import (
-	"YstuPortal/internal/domain"
 	"context"
 	"fmt"
 	"io"
@@ -11,254 +10,249 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/R0n1ns/YstuPortal/internal/domain"
 
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/text/encoding/charmap"
 )
 
+const (
+	loginPath   = "/WPROG/auth1.php"
+	profilePath = "/WPROG/lk/lkstud2.php"
+	gradesPath  = "/WPROG/lk/lkstud_oc.php"
+)
+
+type userSession struct {
+	client   *http.Client
+	lastUsed time.Time
+}
+
 type UserParser struct {
-	mu      sync.RWMutex
-	clients map[string]*http.Client
-	cookies map[string][]*http.Cookie
+	mu         sync.RWMutex
+	sessions   map[string]*userSession
+	baseURL    string
+	portalCode string
+	timeout    time.Duration
+	sessionTTL time.Duration
 }
 
-func NewUserParser() *UserParser {
+func NewUserParser(baseURL, portalCode string, timeout, sessionTTL time.Duration) *UserParser {
 	return &UserParser{
-		clients: make(map[string]*http.Client),
-		cookies: make(map[string][]*http.Cookie),
-	}
-}
-func (u *UserParser) Close() {
-	for _, client := range u.clients {
-		client.CloseIdleConnections()
+		sessions:   make(map[string]*userSession),
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		portalCode: portalCode,
+		timeout:    timeout,
+		sessionTTL: sessionTTL,
 	}
 }
 
-func (s *UserParser) GetUser(ctx context.Context, username, password string) (*domain.User, error) {
+func (p *UserParser) Close() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for userName, session := range p.sessions {
+		session.client.CloseIdleConnections()
+		delete(p.sessions, userName)
+	}
+}
+
+func (p *UserParser) CloseSession(userName string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if session, ok := p.sessions[userName]; ok {
+		session.client.CloseIdleConnections()
+		delete(p.sessions, userName)
+	}
+}
+
+func (p *UserParser) GetUser(ctx context.Context, username, password string) (*domain.User, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	// 1. Инициализируем клиент
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{
-		Jar: jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return nil // Разрешаем редиректы
-		},
-	}
 
-	// 2. Авторизация
-	loginURL := "https://www.ystu.ru/WPROG/auth1.php"
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create cookie jar: %w", err)
+	}
+	client := &http.Client{Jar: jar, Timeout: p.timeout}
+
 	form := url.Values{}
-	form.Set("codeYSTU", "330785001")
+	form.Set("codeYSTU", p.portalCode)
 	form.Set("login", username)
 	form.Set("password", password)
-
-	// Добавляем login1 в кодировке Win1251 вручную
 	body := form.Encode() + "&login1=%C2%F5%EE%E4+%BB"
 
-	req, _ := http.NewRequest("POST", loginURL, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL+loginPath, strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("create login request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка запроса: %w", err)
+		return nil, fmt.Errorf("login request: %w", err)
 	}
-	defer func() { _ = resp.Body.Close() }()
+	if err := closeResponse(resp, "login"); err != nil {
+		return nil, err
+	}
 
-	// 3. Переход в личный кабинет для парсинга данных
-	// После успешного POST нас редиректит, но мы явно запросим страницу ЛК
-	lkURL := "https://www.ystu.ru/WPROG/lk/lkstud2.php"
-	lkResp, err := client.Get(lkURL)
+	profileReq, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+profilePath, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка перехода в ЛК: %w", err)
+		return nil, fmt.Errorf("create profile request: %w", err)
 	}
-	defer func() { _ = lkResp.Body.Close() }()
-
-	// Декодируем кодировку вузовского портала
-	utfBody, _ := DecodeWindows1251(lkResp.Body)
-	doc, err := goquery.NewDocumentFromReader(utfBody)
+	profileResp, err := client.Do(profileReq)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка парсинга HTML: %w", err)
+		return nil, fmt.Errorf("profile request: %w", err)
+	}
+	defer func() { _ = profileResp.Body.Close() }()
+	if err := checkStatus(profileResp, "profile"); err != nil {
+		return nil, err
 	}
 
-	// Проверка: удалось ли войти (ищем ФИО в заголовке h1)
+	doc, err := decodeDocument(profileResp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parse profile: %w", err)
+	}
 	fullName := strings.TrimSpace(doc.Find("h1").First().Text())
 	if fullName == "" {
-		return nil, fmt.Errorf("авторизация не удалась: неверный логин или пароль")
+		return nil, fmt.Errorf("%w: profile page does not contain a user name", domain.ErrInvalidCredentials)
 	}
 
-	// 4. Заполнение структуры User
-	newUser := domain.User{}
-	newUser.UserName = username
-	newUser.Registered = true
-
+	user := &domain.User{UserName: username, Registered: true, Role: "student"}
 	nameParts := strings.Fields(fullName)
-	if len(nameParts) >= 1 {
-		newUser.LastName = nameParts[0]
+	if len(nameParts) > 0 {
+		user.LastName = nameParts[0]
 	}
-	if len(nameParts) >= 2 {
-		newUser.FirstName = nameParts[1]
+	if len(nameParts) > 1 {
+		user.FirstName = nameParts[1]
 	}
-	if len(nameParts) >= 3 {
-		newUser.Patronymic = nameParts[2]
+	if len(nameParts) > 2 {
+		user.Patronymic = nameParts[2]
 	}
-
-	// Парсим группу
-	doc.Find("table tr").Each(func(i int, sel *goquery.Selection) {
-		if strings.Contains(sel.Text(), "Группа:") {
-			newUser.Group = strings.TrimSpace(sel.Find("td").Last().Text())
+	doc.Find("table tr").Each(func(_ int, row *goquery.Selection) {
+		if strings.Contains(row.Text(), "Группа:") {
+			user.Group = strings.TrimSpace(row.Find("td").Last().Text())
 		}
 	})
 
-	// Сохраняем куки из Jar
-	u, _ := url.Parse("https://www.ystu.ru")
-
-	// 5. Сохраняем клиента в кэш хранилища для последующего использования
-	s.mu.Lock()
-	s.clients[newUser.UserName] = client
-	s.cookies[newUser.UserName] = client.Jar.Cookies(u)
-	s.mu.Unlock()
-
-	return &newUser, nil
-}
-
-func DecodeWindows1251(r io.Reader) (io.Reader, error) {
-	return charmap.Windows1251.NewDecoder().Reader(r), nil
-}
-
-func (u *UserParser) GetHttpClient(userName string) (*http.Client, error) {
-	u.mu.Lock()
-	user, ok := u.clients[userName]
-	if !ok {
-		return nil, fmt.Errorf("нет такого пользователя")
+	p.mu.Lock()
+	p.pruneExpiredLocked(time.Now())
+	if previous, ok := p.sessions[username]; ok {
+		previous.client.CloseIdleConnections()
 	}
-	u.mu.Unlock()
+	p.sessions[username] = &userSession{client: client, lastUsed: time.Now()}
+	p.mu.Unlock()
+
 	return user, nil
 }
 
-func (s *UserParser) GetEstimations(ctx context.Context) (*[]domain.Subject, error) {
-	//fmt.Println(1)
+func (p *UserParser) GetGrades(ctx context.Context, userName string) ([]domain.Subject, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	userName, ok := ctx.Value("UserName").(string)
-	if !ok || strings.TrimSpace(userName) == "" {
-		return nil, fmt.Errorf("не задан UserName в контексте")
+
+	p.mu.Lock()
+	p.pruneExpiredLocked(time.Now())
+	session, ok := p.sessions[userName]
+	if ok {
+		session.lastUsed = time.Now()
+	}
+	p.mu.Unlock()
+	if !ok {
+		return nil, domain.ErrSessionNotFound
 	}
 
-	s.mu.RLock()
-	client, ok := s.clients[userName]
-	s.mu.RUnlock()
-	if !ok || client == nil {
-		return nil, fmt.Errorf("нет клиента для пользователя")
-	}
-
-	estimationsURL := "https://www.ystu.ru/WPROG/lk/lkstud_oc.php"
-	resp, err := client.Get(estimationsURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+gradesPath, nil)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка запроса оценок: %w", err)
+		return nil, fmt.Errorf("create grades request: %w", err)
+	}
+	resp, err := session.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("grades request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if err := checkStatus(resp, "grades"); err != nil {
+		return nil, err
+	}
 
-	utfBody, _ := DecodeWindows1251(resp.Body)
-	doc, err := goquery.NewDocumentFromReader(utfBody)
+	doc, err := decodeDocument(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка парсинга HTML: %w", err)
+		return nil, fmt.Errorf("parse grades: %w", err)
 	}
+	return parseGrades(doc)
+}
 
-	normalize := func(text string) string {
-		text = strings.ReplaceAll(text, "\u00a0", " ")
-		text = strings.ToLower(strings.TrimSpace(text))
-		text = strings.ReplaceAll(text, "\n", " ")
-		text = strings.ReplaceAll(text, "\r", " ")
-		text = strings.ReplaceAll(text, "\t", " ")
-		text = strings.Join(strings.Fields(text), "")
-		return text
+func (p *UserParser) pruneExpiredLocked(now time.Time) {
+	if p.sessionTTL <= 0 {
+		return
 	}
-
-	extractInt := func(text string) int {
-		var b strings.Builder
-		for _, r := range text {
-			if r >= '0' && r <= '9' {
-				_ = b.WriteByte(byte(r))
-			}
+	for userName, session := range p.sessions {
+		if now.Sub(session.lastUsed) > p.sessionTTL {
+			session.client.CloseIdleConnections()
+			delete(p.sessions, userName)
 		}
-		if b.Len() == 0 {
-			return 0
-		}
-		value, err := strconv.Atoi(b.String())
-		if err != nil {
-			return 0
-		}
-		return value
 	}
+}
 
+func closeResponse(resp *http.Response, operation string) error {
+	defer func() { _ = resp.Body.Close() }()
+	if err := checkStatus(resp, operation); err != nil {
+		return err
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return nil
+}
+
+func checkStatus(resp *http.Response, operation string) error {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("%s: upstream returned HTTP %d", operation, resp.StatusCode)
+	}
+	return nil
+}
+
+func decodeDocument(body io.Reader) (*goquery.Document, error) {
+	decoded := charmap.Windows1251.NewDecoder().Reader(body)
+	return goquery.NewDocumentFromReader(decoded)
+}
+
+func parseGrades(doc *goquery.Document) ([]domain.Subject, error) {
 	headerIndex := map[string]int{}
-	var tableWithGrades *goquery.Selection
+	var gradesTable *goquery.Selection
 	var headerRow *goquery.Selection
 
 	doc.Find("table").EachWithBreak(func(_ int, table *goquery.Selection) bool {
-		var found bool
+		found := false
 		table.Find("tr").EachWithBreak(func(_ int, row *goquery.Selection) bool {
-			cells := row.Find("th, td")
-			if cells.Length() == 0 {
-				return true
-			}
-			localIndex := map[string]int{}
-			cells.Each(func(i int, cell *goquery.Selection) {
-				cellText := normalize(cell.Text())
-				switch {
-				case strings.Contains(cellText, "№"):
-					localIndex["num"] = i
-				case strings.Contains(cellText, "курс"):
-					localIndex["course"] = i
-				case strings.Contains(cellText, "семестр"):
-					localIndex["semester"] = i
-				case strings.Contains(cellText, "наименовани"):
-					localIndex["title"] = i
-				case strings.Contains(cellText, "видконтрол"):
-					localIndex["type"] = i
-				case strings.Contains(cellText, "зед"):
-					localIndex["zed"] = i
-				case strings.Contains(cellText, "балл"):
-					localIndex["score"] = i
-				case strings.Contains(cellText, "оценка"):
-					localIndex["evaluation"] = i
-				}
-			})
-			if _, ok := localIndex["title"]; ok {
-				if _, ok := localIndex["evaluation"]; ok {
-					found = true
-					headerIndex = localIndex
-					headerRow = row
+			localIndex := gradeHeaderIndexes(row.Find("th, td"))
+			if _, titleOK := localIndex["title"]; titleOK {
+				if _, evaluationOK := localIndex["evaluation"]; evaluationOK {
+					headerIndex, headerRow, found = localIndex, row, true
 					return false
 				}
 			}
 			return true
 		})
 		if found {
-			tableWithGrades = table
+			gradesTable = table
 			return false
 		}
 		return true
 	})
-
-	if tableWithGrades == nil {
-		return nil, fmt.Errorf("таблица оценок не найдена")
+	if gradesTable == nil {
+		return nil, fmt.Errorf("grades table not found")
 	}
 
-	getCellText := func(cells *goquery.Selection, key string) string {
-		idx, ok := headerIndex[key]
-		if !ok || idx >= cells.Length() {
+	cellText := func(cells *goquery.Selection, key string) string {
+		index, ok := headerIndex[key]
+		if !ok || index >= cells.Length() {
 			return ""
 		}
-		return strings.TrimSpace(cells.Eq(idx).Text())
+		return strings.TrimSpace(cells.Eq(index).Text())
 	}
 
-	result := []domain.Subject{}
-	rowCounter := 0
-	tableWithGrades.Find("tr").Each(func(_ int, row *goquery.Selection) {
+	grades := make([]domain.Subject, 0)
+	gradesTable.Find("tr").Each(func(_ int, row *goquery.Selection) {
 		if headerRow != nil && row.IsSelection(headerRow) {
 			return
 		}
@@ -266,31 +260,62 @@ func (s *UserParser) GetEstimations(ctx context.Context) (*[]domain.Subject, err
 		if cells.Length() == 0 {
 			return
 		}
-
-		numValue := extractInt(getCellText(cells, "num"))
-		if numValue == 0 {
-			rowCounter++
-			numValue = rowCounter
-		}
-
-		title := strings.TrimSpace(getCellText(cells, "title"))
+		title := cellText(cells, "title")
 		diploma := strings.Contains(title, "*")
 		title = strings.TrimSpace(strings.ReplaceAll(title, "*", ""))
-
-		subject := domain.Subject{
-			Course:        extractInt(getCellText(cells, "course")),
-			Semester:      extractInt(getCellText(cells, "semester")),
-			Title:         title,
-			TypeOfControl: strings.TrimSpace(getCellText(cells, "type")),
-			Zed:           extractInt(getCellText(cells, "zed")),
-			Mark:          strings.TrimSpace(getCellText(cells, "score")),
-			Evaluation:    strings.TrimSpace(getCellText(cells, "evaluation")),
-			Diploma:       diploma,
+		if title == "" {
+			return
 		}
-
-		result = append(result, subject)
+		grades = append(grades, domain.Subject{
+			Course:        extractInt(cellText(cells, "course")),
+			Semester:      extractInt(cellText(cells, "semester")),
+			Title:         title,
+			TypeOfControl: cellText(cells, "type"),
+			Zed:           extractInt(cellText(cells, "zed")),
+			Mark:          cellText(cells, "score"),
+			Evaluation:    cellText(cells, "evaluation"),
+			Diploma:       diploma,
+		})
 	})
-	//fmt.Println(result)
+	return grades, nil
+}
 
-	return &result, nil
+func gradeHeaderIndexes(cells *goquery.Selection) map[string]int {
+	indexes := map[string]int{}
+	cells.Each(func(index int, cell *goquery.Selection) {
+		text := normalize(cell.Text())
+		switch {
+		case strings.Contains(text, "курс"):
+			indexes["course"] = index
+		case strings.Contains(text, "семестр"):
+			indexes["semester"] = index
+		case strings.Contains(text, "наименовани"):
+			indexes["title"] = index
+		case strings.Contains(text, "видконтрол"):
+			indexes["type"] = index
+		case strings.Contains(text, "зед"):
+			indexes["zed"] = index
+		case strings.Contains(text, "балл"):
+			indexes["score"] = index
+		case strings.Contains(text, "оценка"):
+			indexes["evaluation"] = index
+		}
+	})
+	return indexes
+}
+
+func normalize(value string) string {
+	value = strings.NewReplacer("\u00a0", " ", "\n", " ", "\r", " ", "\t", " ").Replace(value)
+	return strings.ToLower(strings.Join(strings.Fields(value), ""))
+}
+
+func extractInt(value string) int {
+	var digits strings.Builder
+	for _, symbol := range value {
+		if symbol >= '0' && symbol <= '9' {
+			digits.WriteRune(symbol)
+		}
+	}
+	result, _ := strconv.Atoi(digits.String())
+	return result
 }

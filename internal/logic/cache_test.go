@@ -1,9 +1,9 @@
 package logic
 
 import (
-	"YstuPortal/internal/domain"
 	"context"
 	"errors"
+	"github.com/R0n1ns/YstuPortal/internal/domain"
 	"testing"
 	"time"
 )
@@ -40,11 +40,11 @@ func (p *stubProvider) GetUser(ctx context.Context, username, password string) (
 	return nil, errors.New("provider should not be called")
 }
 
-func (p *stubProvider) GetEstimations(ctx context.Context) (*[]domain.Subject, error) {
+func (p *stubProvider) GetGrades(ctx context.Context, userName string) ([]domain.Subject, error) {
 	return nil, errors.New("provider should not be called")
 }
 
-func TestGetEstimationsUsesCache(t *testing.T) {
+func TestGetGradesUsesCache(t *testing.T) {
 	cached := []domain.Subject{{Title: "Math"}}
 	cache := &stubCache{data: cached, ok: true}
 	storage := &stubStorage{}
@@ -55,7 +55,7 @@ func TestGetEstimationsUsesCache(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	data, err := manager.GetEstimations(context.Background(), "user")
+	data, err := manager.GetGrades(context.Background(), "user")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

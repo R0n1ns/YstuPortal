@@ -7,4 +7,4 @@ formatters:
 run:
   timeout: 5m
   relative-path-mode: gomod
-  tests: false
+  tests: true

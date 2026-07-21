@@ -1,30 +1,20 @@
-FROM golang:1.26 AS builder
+FROM golang:1.25.0-alpine3.22 AS builder
 
-WORKDIR /app
-
-#RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-#RUN go install golang.org/x/tools/cmd/goimports@latest
-
+WORKDIR /src
 COPY go.mod go.sum ./
-
 RUN go mod download
-
 COPY . .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api \
+    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
-#RUN test -z "$(gofmt -l .)"
-#RUN test -z "$(goimports -l .)"
-#RUN go vet ./...
-#RUN /go/bin/golangci-lint run
-#RUN go test ./...
+FROM alpine:3.22
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o app ./cmd/api/main.go
-
-FROM alpine:latest
-
-WORKDIR /root/
-
-COPY --from=builder /app/app .
-
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S app \
+    && adduser -S -G app app
+WORKDIR /app
+COPY --from=builder /out/api /out/migrate ./
+COPY migrations ./migrations
+USER app
 EXPOSE 8080
-
-CMD ["./app"]
+CMD ["/app/api"]

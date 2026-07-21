@@ -1,9 +1,9 @@
 package logic
 
 import (
-	"YstuPortal/internal/domain"
 	"context"
 	"errors"
+	"github.com/R0n1ns/YstuPortal/internal/domain"
 	"testing"
 
 	"github.com/stretchr/testify/mock"

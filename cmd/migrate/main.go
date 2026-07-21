@@ -26,6 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("create migrate: %v", err)
 	}
+	defer func() { _, _ = m.Close() }()
 
 	switch *direction {
 	case "up":
